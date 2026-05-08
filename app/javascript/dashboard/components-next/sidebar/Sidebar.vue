@@ -74,7 +74,7 @@ const hasCustomTools = computed(() => {
 });
 
 const hasCrmAiAgents = computed(() =>
-  isFeatureEnabledonAccount.value(accountId.value, FEATURE_FLAGS.CRM_AI_AGENTS)
+  isFeatureEnabledonAccount.value(accountId.value, FEATURE_FLAGS.CRM)
 );
 
 const toggleShortcutModalFn = show => {

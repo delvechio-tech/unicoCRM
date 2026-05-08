@@ -38,9 +38,9 @@ Cuidados:
 
 Primeira fatia implementada:
 
-- Feature flag `crm_ai_agents`.
-- Super Admin / All Features exibe `Agentes de IA`.
-- Quando `crm_ai_agents` esta ativo, o menu lateral mostra `Agentes de IA` no lugar do Captain.
+- Usa a feature flag existente `crm` para evitar estourar o limite do bitset `feature_flags`.
+- Super Admin / All Features exibe `CRM / Agentes de IA`.
+- Quando `crm` esta ativo, o menu lateral mostra `Agentes de IA` no lugar do Captain.
 - Captain fica como fallback caso a feature seja desligada.
 - Produtos sao entidades do CRM, nao do agente.
 - O agente consulta produtos vinculados.
@@ -83,6 +83,7 @@ Stack de producao atual deve usar:
 - `delvechiotech/unicocrm:latest` em `chatwoot_sidekiq`.
 
 Depois de trocar a imagem, executar repull/update da stack para aplicar migrations e compilar o frontend novo.
+Nao montar volume externo em `/app/public`, pois isso pode servir assets antigos e esconder telas novas como WhatsApp API/Quepasa e Agentes de IA.
 
 ## Cuidados de desenvolvimento
 
@@ -91,4 +92,3 @@ Depois de trocar a imagem, executar repull/update da stack para aplicar migratio
 - `.gitignore` tem uma alteracao local relacionada ao GitNexus que ficou fora do commit inicial do UnicoCRM.
 - Builds Docker recentes passaram com sucesso, apesar de avisos antigos do Dockerfile/Sass.
 - Se novas migrations forem adicionadas, garantir que `rails db:chatwoot_prepare` rode na inicializacao da stack.
-

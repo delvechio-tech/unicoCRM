@@ -10,7 +10,7 @@ export const routes = [
     component: AiAgentsIndex,
     meta: {
       permissions: ['administrator', 'agent'],
-      featureFlag: FEATURE_FLAGS.CRM_AI_AGENTS,
+      featureFlag: FEATURE_FLAGS.CRM,
     },
   },
 ];

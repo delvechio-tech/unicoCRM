@@ -89,7 +89,7 @@
   enabled: true
   help_url: https://chwt.app/hc/reports
 - name: crm
-  display_name: CRM
+  display_name: CRM / Agentes de IA
   enabled: true
 - name: auto_resolve_conversations
   display_name: Auto Resolve Conversations
@@ -240,8 +240,4 @@
 - name: advanced_assignment
   display_name: Advanced Assignment
   enabled: false
-  premium: false
-- name: crm_ai_agents
-  display_name: CRM AI Agents
-  enabled: true
   premium: false
