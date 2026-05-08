@@ -241,3 +241,7 @@
   display_name: Advanced Assignment
   enabled: false
   premium: false
+- name: crm_ai_agents
+  display_name: CRM AI Agents
+  enabled: true
+  premium: false

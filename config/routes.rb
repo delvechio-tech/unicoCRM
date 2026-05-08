@@ -84,6 +84,10 @@ Rails.application.routes.draw do
               post :follow_up
             end
           end
+          namespace :crm do
+            resources :ai_agents, only: [:index, :show, :create, :update, :destroy]
+            resources :products, only: [:index, :show, :create, :update, :destroy]
+          end
           resource :saml_settings, only: [:show, :create, :update, :destroy]
           resources :agent_bots, only: [:index, :create, :show, :update, :destroy] do
             delete :avatar, on: :member

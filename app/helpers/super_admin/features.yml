@@ -47,6 +47,12 @@ captain:
   enabled: true
   icon: 'icon-captain'
   config_key: 'captain'
+crm_ai_agents:
+  name: 'Agentes de IA'
+  description: 'Configure native CRM AI agents, product knowledge and n8n execution.'
+  enabled: true
+  icon: 'icon-bot-line'
+  config_key: 'crm_ai_agents'
 
 # ------- Communication Channels ------- #
 live_chat:

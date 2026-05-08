@@ -73,6 +73,10 @@ const hasCustomTools = computed(() => {
   );
 });
 
+const hasCrmAiAgents = computed(() =>
+  isFeatureEnabledonAccount.value(accountId.value, FEATURE_FLAGS.CRM_AI_AGENTS)
+);
+
 const toggleShortcutModalFn = show => {
   if (show) {
     emit('openKeyShortcutModal');
@@ -325,12 +329,23 @@ const menuItems = computed(() => {
         },
       ],
     },
-    {
-      name: 'Captain',
-      icon: 'i-woot-captain',
-      label: t('SIDEBAR.CAPTAIN'),
-      activeOn: ['captain_assistants_create_index'],
-      children: [
+    ...(hasCrmAiAgents.value
+      ? [
+          {
+            name: 'AI Agents',
+            icon: 'i-lucide-bot',
+            label: 'Agentes de IA',
+            activeOn: ['crm_ai_agents_index'],
+            to: accountScopedRoute('crm_ai_agents_index'),
+          },
+        ]
+      : [
+          {
+            name: 'Captain',
+            icon: 'i-woot-captain',
+            label: t('SIDEBAR.CAPTAIN'),
+            activeOn: ['captain_assistants_create_index'],
+            children: [
         {
           name: 'FAQs',
           label: t('SIDEBAR.CAPTAIN_RESPONSES'),
@@ -398,8 +413,9 @@ const menuItems = computed(() => {
             navigationPath: 'captain_assistants_settings_index',
           }),
         },
-      ],
-    },
+            ],
+          },
+        ]),
     {
       name: 'Contacts',
       label: t('SIDEBAR.CONTACTS'),

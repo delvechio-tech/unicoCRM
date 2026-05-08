@@ -110,6 +110,8 @@ class Account < ApplicationRecord
   has_many :contacts, dependent: :destroy_async
   has_many :conversations, dependent: :destroy_async
   has_many :csat_survey_responses, dependent: :destroy_async
+  has_many :crm_ai_agents, dependent: :destroy_async, class_name: '::Crm::AiAgent'
+  has_many :crm_products, dependent: :destroy_async, class_name: '::Crm::Product'
   has_many :custom_attribute_definitions, dependent: :destroy_async
   has_many :custom_filters, dependent: :destroy_async
   has_many :dashboard_apps, dependent: :destroy_async
