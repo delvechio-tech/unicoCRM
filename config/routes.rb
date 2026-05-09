@@ -85,7 +85,27 @@ Rails.application.routes.draw do
             end
           end
           namespace :crm do
-            resources :ai_agents, only: [:index, :show, :create, :update, :destroy]
+            resource :kanban, only: [:show, :update], controller: 'kanban' do
+              post 'cards', to: 'kanban#create_card'
+              patch 'cards/:card_id', to: 'kanban#update_card'
+              delete 'cards/:card_id', to: 'kanban#destroy_card'
+              post 'cards/:card_id/activities', to: 'kanban#create_activity'
+              patch 'cards/:card_id/activities/:activity_id', to: 'kanban#update_activity'
+              post 'cards/:card_id/activities/:activity_id/complete', to: 'kanban#complete_activity'
+              patch 'stages/:stage_id', to: 'kanban#update_stage'
+              post 'webhooks', to: 'kanban#create_webhook'
+              patch 'webhooks/:webhook_id', to: 'kanban#update_webhook'
+              delete 'webhooks/:webhook_id', to: 'kanban#destroy_webhook'
+            end
+            resources :ai_agents, only: [:index, :show, :create, :update, :destroy] do
+              post :playground, on: :member
+              get 'tools/search_products', to: 'ai_agent_tools#search_products'
+              get 'tools/products/:product_id', to: 'ai_agent_tools#show_product'
+              get 'tools/search_faqs', to: 'ai_agent_tools#search_faqs'
+              get 'tools/search_kanban_cards', to: 'ai_agent_tools#search_kanban_cards'
+              patch 'tools/kanban_cards/:card_id', to: 'ai_agent_tools#update_kanban_card'
+              post 'tools/kanban_cards/:card_id/activities', to: 'ai_agent_tools#create_kanban_activity'
+            end
             resources :products, only: [:index, :show, :create, :update, :destroy]
           end
           resource :saml_settings, only: [:show, :create, :update, :destroy]

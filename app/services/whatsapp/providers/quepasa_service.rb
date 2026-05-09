@@ -190,9 +190,16 @@ class Whatsapp::Providers::QuepasaService < Whatsapp::Providers::BaseService
   def client
     @client ||= Whatsapp::Quepasa::Client.new(
       token: provider_config['token'],
-      user: provider_config['username'],
+      user: quepasa_user,
       password: provider_config['password']
     )
+  end
+
+  def quepasa_user
+    user = provider_config['username'].presence
+    return if user == 'chatwoot'
+
+    user
   end
 
   def webhook_url

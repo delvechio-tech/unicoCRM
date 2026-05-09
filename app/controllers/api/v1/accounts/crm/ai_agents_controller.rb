@@ -1,5 +1,5 @@
 class Api::V1::Accounts::Crm::AiAgentsController < Api::V1::Accounts::BaseController
-  before_action :fetch_ai_agent, only: [:show, :update, :destroy]
+  before_action :fetch_ai_agent, only: [:show, :update, :destroy, :playground]
 
   def index
     render json: Current.account.crm_ai_agents.includes(:products, :inboxes).order(updated_at: :desc).map { |agent| agent_payload(agent) }
@@ -27,6 +27,13 @@ class Api::V1::Accounts::Crm::AiAgentsController < Api::V1::Accounts::BaseContro
   def destroy
     @ai_agent.destroy!
     head :ok
+  end
+
+  def playground
+    render json: Crm::AiAgents::PlaygroundService.new(
+      agent: @ai_agent,
+      message: params[:message]
+    ).perform
   end
 
   private

@@ -111,6 +111,12 @@ class Account < ApplicationRecord
   has_many :conversations, dependent: :destroy_async
   has_many :csat_survey_responses, dependent: :destroy_async
   has_many :crm_ai_agents, dependent: :destroy_async, class_name: '::Crm::AiAgent'
+  has_many :crm_kanban_cards, dependent: :destroy_async, class_name: '::Crm::KanbanCard'
+  has_many :crm_kanban_pipelines, dependent: :destroy_async, class_name: '::Crm::KanbanPipeline'
+  has_many :crm_kanban_stages, dependent: :destroy_async, class_name: '::Crm::KanbanStage'
+  has_many :crm_kanban_actions, dependent: :destroy_async, class_name: '::Crm::KanbanAction'
+  has_many :crm_kanban_activities, dependent: :destroy_async, class_name: '::Crm::KanbanActivity'
+  has_many :crm_kanban_webhooks, dependent: :destroy_async, class_name: '::Crm::KanbanWebhook'
   has_many :crm_products, dependent: :destroy_async, class_name: '::Crm::Product'
   has_many :custom_attribute_definitions, dependent: :destroy_async
   has_many :custom_filters, dependent: :destroy_async

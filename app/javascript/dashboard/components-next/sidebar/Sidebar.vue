@@ -332,6 +332,13 @@ const menuItems = computed(() => {
     ...(hasCrmAiAgents.value
       ? [
           {
+            name: 'CRM Kanban',
+            icon: 'i-lucide-panels-top-left',
+            label: 'Kanban',
+            activeOn: ['crm_kanban_index'],
+            to: accountScopedRoute('crm_kanban_index'),
+          },
+          {
             name: 'AI Agents',
             icon: 'i-lucide-bot',
             label: 'Agentes de IA',
@@ -760,7 +767,7 @@ const menuItems = computed(() => {
       closeMobileSidebar,
       { ignore: ['#mobile-sidebar-launcher'] },
     ]"
-    class="bg-n-background flex flex-col text-sm pb-px fixed top-0 ltr:left-0 rtl:right-0 h-full z-40 w-[200px] md:w-auto md:relative md:flex-shrink-0 md:ltr:translate-x-0 md:rtl:translate-x-0 ltr:border-r rtl:border-l border-n-weak"
+    class="crm-app-sidebar bg-n-background flex flex-col text-sm pb-px fixed top-0 ltr:left-0 rtl:right-0 h-full z-40 w-[200px] md:w-auto md:relative md:flex-shrink-0 md:ltr:translate-x-0 md:rtl:translate-x-0 ltr:border-r rtl:border-l border-n-weak"
     :class="[
       {
         'shadow-lg md:shadow-none': isMobileSidebarOpen,
@@ -904,3 +911,36 @@ const menuItems = computed(() => {
     </div>
   </aside>
 </template>
+
+<style scoped>
+.crm-app-sidebar {
+  background:
+    linear-gradient(180deg, rgb(var(--surface-2)) 0%, rgb(var(--surface-1)) 100%);
+  box-shadow: 1px 0 0 rgba(var(--border-container));
+}
+
+.crm-app-sidebar :deep(a),
+.crm-app-sidebar :deep(button) {
+  border-radius: 8px;
+}
+
+.crm-app-sidebar :deep(nav) {
+  padding-top: 0.25rem;
+}
+
+.crm-app-sidebar :deep(nav a),
+.crm-app-sidebar :deep(nav button) {
+  margin-bottom: 0.125rem;
+}
+
+.crm-app-sidebar :deep(.router-link-active),
+.crm-app-sidebar :deep([aria-current='page']) {
+  color: rgb(var(--blue-11));
+}
+
+@media (max-width: 767px) {
+  .crm-app-sidebar {
+    width: min(19rem, 88vw);
+  }
+}
+</style>

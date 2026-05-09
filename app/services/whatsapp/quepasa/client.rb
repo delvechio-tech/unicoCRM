@@ -10,22 +10,25 @@ class Whatsapp::Quepasa::Client
     @master_key = ENV.fetch('QUEPASA_MASTER_KEY', nil).presence
     @user = user.presence || ENV.fetch('QUEPASA_USER', ENV.fetch('QUEPASA_USERNAME', ENV.fetch('QUEPASA_DEFAULT_USER', nil))).presence
     @password = password.presence || ENV.fetch('QUEPASA_PASSWORD', ENV.fetch('QUEPASA_DEFAULT_PASSWORD', nil)).presence
-    @user ||= 'chatwoot' if @master_key.present?
-    @password ||= @master_key if @user.present?
+    @user ||= generated_user if @master_key.present?
+    @password ||= @master_key if @user.present? && @master_key.present?
   end
 
   def bot_headers
-    headers = { 'X-QUEPASA-TOKEN' => @token, 'Content-Type' => 'application/json' }
-    headers.merge!(master_headers)
-    headers
+    { 'X-QUEPASA-TOKEN' => @token, 'Content-Type' => 'application/json' }
   end
 
-  def master_headers
+  def creation_headers
+    bot_headers.tap do |headers|
+      headers.merge!(master_key_headers)
+      headers['X-QUEPASA-USER'] = @user if @user.present?
+      headers['X-QUEPASA-PASSWORD'] = @password if @password.present?
+    end
+  end
+
+  def master_key_headers
     headers = { 'Content-Type' => 'application/json' }
-    headers['X-QUEPASA-USER'] = @user if @user.present?
-    headers['X-QUEPASA-PASSWORD'] = @password if @password.present?
     if @master_key.present?
-      headers['X-QUEPASA-PASSWORD'] ||= @master_key
       headers['X-QUEPASA-MASTERKEY'] = @master_key
       headers['X-QUEPASA-MASTER-KEY'] = @master_key
     end
@@ -91,8 +94,7 @@ class Whatsapp::Quepasa::Client
   end
 
   def update_settings!(settings)
-    HTTParty.patch("#{base_url}/info", headers: bot_headers, body: { settings: settings }.to_json)
-    response = post_info(settings, bot_headers)
+    response = HTTParty.patch("#{base_url}/info", headers: bot_headers, body: { settings: settings }.to_json)
     raise "Quepasa settings update failed [#{response.code}]: #{response.body}" unless response.success?
 
     parsed_body(response)
@@ -192,25 +194,33 @@ class Whatsapp::Quepasa::Client
       headers: master_access_headers,
       body: { username: @user, password: @password }.to_json
     )
-    return if response.success? || [400, 406, 409].include?(response.code)
+    return if response.success? || [406, 409].include?(response.code)
+    return if response.code == 400 && parsed_body(response).values.join(' ').downcase.include?('exist')
 
     raise "Quepasa account setup failed [#{response.code}]: #{response.body}"
+  end
+
+  def generated_user
+    digest = Digest::SHA256.hexdigest(@token.to_s).first(12)
+    "unicocrm_#{digest}"
   end
 
   def master_access_headers
     {
       'X-QUEPASA-TOKEN' => @master_key,
+      'X-QUEPASA-MASTERKEY' => @master_key,
+      'X-QUEPASA-MASTER-KEY' => @master_key,
       'Content-Type' => 'application/json'
     }
   end
 
   def post_info(settings, headers)
-    response = HTTParty.post("#{base_url}/info", headers: headers, body: settings.to_json)
+    response = HTTParty.post("#{base_url}/info", headers: creation_headers.merge(headers), body: settings.to_json)
     return response if response.success? || response.code == 409 || response.code == 406
     return response unless @master_key.present? && @user.present? && @password.present?
 
     ensure_account!
-    HTTParty.post("#{base_url}/info", headers: headers, body: settings.to_json)
+    HTTParty.post("#{base_url}/info", headers: creation_headers.merge(headers), body: settings.to_json)
   end
 
   def webhooks
