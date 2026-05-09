@@ -38,7 +38,7 @@ Regra central: cada chat trabalha no seu escopo, atualiza os documentos ao termi
 - Imagem Docker atual: `delvechiotech/unicocrm:latest`
 - Stack Portainer: `chatwoot`, stack id `7`, endpoint `1`
 - URL: `https://chat.unicocrm.com`
-- Ultimo deploy conhecido: digest `sha256:82adb17f73679caf8447417fde30d256fa6640620d2107fd8f25f08502f4789b`
+- Ultimo deploy conhecido: digest `sha256:c573fde235b25b70380cb98a13ce77643f569636452011c802859978c6ca4414`
 - O deploy pode conter alteracoes locais ainda nao commitadas. Nao assumir que GitHub e producao estao iguais.
 - Nao executar `git push` sem pedido explicito do Thiago.
 - Nao montar volume externo em `/app/public`, pois isso pode servir assets antigos e esconder telas novas.
@@ -453,7 +453,7 @@ Memoria essencial:
 Estado atual conhecido:
 
 - Kanban nativo esta implementado e deployado em producao.
-- Ultimo deploy conhecido desta frente: `delvechiotech/unicocrm:latest@sha256:82adb17f73679caf8447417fde30d256fa6640620d2107fd8f25f08502f4789b`.
+- Ultimo deploy conhecido desta frente: `delvechiotech/unicocrm:latest@sha256:c573fde235b25b70380cb98a13ce77643f569636452011c802859978c6ca4414`.
 - Build Docker, push Docker e redeploy Portainer foram feitos; `https://chat.unicocrm.com/` respondeu HTTP `200 OK`.
 - Ainda falta validacao funcional em conta real para sync automatico por mensagem, atividades, webhooks e regras de IA.
 - Tools de IA incluem busca/atualizacao de cards e criacao de atividades.
@@ -493,7 +493,10 @@ Estado atual conhecido:
   - campos `Parado apos` e `Chance` foram redesenhados para corrigir truncamento e proporcao;
   - operacoes de card, atividade, webhook e drag/drop enviam `pipeline_id` selecionado;
   - nao houve alteracao em Quepasa, sync automatico de mensagens, payload n8n ou tools de IA;
-  - build Docker passou e `delvechiotech/unicocrm:latest` foi publicado com digest `sha256:c573fde235b25b70380cb98a13ce77643f569636452011c802859978c6ca4414`.
+  - build Docker passou e `delvechiotech/unicocrm:latest` foi publicado com digest `sha256:c573fde235b25b70380cb98a13ce77643f569636452011c802859978c6ca4414`;
+  - commit `2565f88` foi enviado para `main`;
+  - Portainer stack `chatwoot` foi atualizada com `PullImage=true`;
+  - tasks da stack passaram a rodar a digest nova e `https://chat.unicocrm.com/` respondeu HTTP `200 OK`.
 
 Arquivos sensiveis:
 

@@ -247,7 +247,11 @@ Revisao visual aplicada em 2026-05-09:
   - controles de etapa `Parado apos` e `Chance` foram redesenhados para nao truncar valores nem ficar desproporcionais;
   - `git diff --check` passou nos arquivos alterados;
   - `docker image build -f docker/Dockerfile -t delvechiotech/unicocrm:latest .` passou e gerou manifest list local `sha256:c573fde235b25b70380cb98a13ce77643f569636452011c802859978c6ca4414`;
-  - `docker image push delvechiotech/unicocrm:latest` passou e publicou `latest` com digest `sha256:c573fde235b25b70380cb98a13ce77643f569636452011c802859978c6ca4414`.
+  - `docker image push delvechiotech/unicocrm:latest` passou e publicou `latest` com digest `sha256:c573fde235b25b70380cb98a13ce77643f569636452011c802859978c6ca4414`;
+  - commit `2565f88` foi enviado para `main`;
+  - Portainer stack `chatwoot` foi atualizada com `PullImage=true`;
+  - tasks da stack passaram a rodar `delvechiotech/unicocrm:latest@sha256:c573fde235b25b70380cb98a13ce77643f569636452011c802859978c6ca4414`;
+  - `https://chat.unicocrm.com/` respondeu HTTP `200 OK` apos o deploy.
 - A rodada de controle de funis alterou apenas API/UI do Kanban; nao mexeu em mensageria Quepasa, listener de sync automatico, payload n8n ou tools de IA.
 - Validacoes executadas:
   - `git diff --check` nos arquivos visuais passou;

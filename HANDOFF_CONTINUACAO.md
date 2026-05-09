@@ -252,7 +252,11 @@ Estado atual deste chat:
   - nao houve alteracao em Quepasa, listener de sync automatico, payload n8n ou tools de IA;
   - `git diff --check` passou;
   - `docker image build -f docker/Dockerfile -t delvechiotech/unicocrm:latest .` passou;
-  - `docker image push delvechiotech/unicocrm:latest` publicou digest `sha256:c573fde235b25b70380cb98a13ce77643f569636452011c802859978c6ca4414`.
+  - `docker image push delvechiotech/unicocrm:latest` publicou digest `sha256:c573fde235b25b70380cb98a13ce77643f569636452011c802859978c6ca4414`;
+  - commit `2565f88` foi enviado para `main`;
+  - Portainer stack `chatwoot` foi atualizada com `PullImage=true`;
+  - tasks da stack passaram a rodar `delvechiotech/unicocrm:latest@sha256:c573fde235b25b70380cb98a13ce77643f569636452011c802859978c6ca4414`;
+  - `https://chat.unicocrm.com/` respondeu HTTP `200 OK` apos o deploy.
 
 Arquivos sensiveis deste chat:
 
