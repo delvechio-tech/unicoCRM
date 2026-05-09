@@ -38,7 +38,7 @@ Regra central: cada chat trabalha no seu escopo, atualiza os documentos ao termi
 - Imagem Docker atual: `delvechiotech/unicocrm:latest`
 - Stack Portainer: `chatwoot`, stack id `7`, endpoint `1`
 - URL: `https://chat.unicocrm.com`
-- Ultimo deploy conhecido: digest `sha256:92af187b6874228fd4d3e17c585dd28dbc6da1a91b9e5e23775120c39dcd0d7f`
+- Ultimo deploy conhecido: digest `sha256:82adb17f73679caf8447417fde30d256fa6640620d2107fd8f25f08502f4789b`
 - O deploy pode conter alteracoes locais ainda nao commitadas. Nao assumir que GitHub e producao estao iguais.
 - Nao executar `git push` sem pedido explicito do Thiago.
 - Nao montar volume externo em `/app/public`, pois isso pode servir assets antigos e esconder telas novas.
@@ -453,7 +453,7 @@ Memoria essencial:
 Estado atual conhecido:
 
 - Kanban nativo esta implementado e deployado em producao.
-- Ultimo deploy conhecido desta frente: `delvechiotech/unicocrm:latest@sha256:c9bf65c7805e79ea48971d83d819053cf682e4cdbaf9422c7ec80f9066fc0298`.
+- Ultimo deploy conhecido desta frente: `delvechiotech/unicocrm:latest@sha256:82adb17f73679caf8447417fde30d256fa6640620d2107fd8f25f08502f4789b`.
 - Build Docker, push Docker e redeploy Portainer foram feitos; `https://chat.unicocrm.com/` respondeu HTTP `200 OK`.
 - Ainda falta validacao funcional em conta real para sync automatico por mensagem, atividades, webhooks e regras de IA.
 - Tools de IA incluem busca/atualizacao de cards e criacao de atividades.
@@ -486,6 +486,14 @@ Estado atual conhecido:
   - Portainer stack `chatwoot` foi atualizada com `PullImage=true`;
   - `chatwoot_chatwoot_app` e `chatwoot_chatwoot_sidekiq` ficaram com update `completed` apontando para `delvechiotech/unicocrm:latest@sha256:82adb17f73679caf8447417fde30d256fa6640620d2107fd8f25f08502f4789b`;
   - `https://chat.unicocrm.com/` respondeu HTTP `200 OK` apos o deploy.
+- Rodada atual de controle de funis/etapas:
+  - API/UI do Kanban agora suportam selecionar, criar, editar e excluir funis vazios;
+  - o funil padrao nao pode ser excluido e funis/etapas com cards sao bloqueados para preservar historico;
+  - etapas podem ser criadas, renomeadas, configuradas e excluidas quando vazias;
+  - campos `Parado apos` e `Chance` foram redesenhados para corrigir truncamento e proporcao;
+  - operacoes de card, atividade, webhook e drag/drop enviam `pipeline_id` selecionado;
+  - nao houve alteracao em Quepasa, sync automatico de mensagens, payload n8n ou tools de IA;
+  - build Docker passou e `delvechiotech/unicocrm:latest` foi publicado com digest `sha256:c573fde235b25b70380cb98a13ce77643f569636452011c802859978c6ca4414`.
 
 Arquivos sensiveis:
 

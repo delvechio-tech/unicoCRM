@@ -6,8 +6,22 @@ class CrmKanbanAPI extends ApiClient {
     super('crm/kanban', { accountScoped: true });
   }
 
-  updatePipeline(data) {
-    return axios.patch(this.url, data);
+  getBoard(params = {}) {
+    return axios.get(this.url, { params });
+  }
+
+  createPipeline(data) {
+    return axios.post(`${this.url}/pipelines`, data);
+  }
+
+  updatePipeline(id, data) {
+    if (data) return axios.patch(`${this.url}/pipelines/${id}`, data);
+
+    return axios.patch(this.url, id);
+  }
+
+  deletePipeline(id) {
+    return axios.delete(`${this.url}/pipelines/${id}`);
   }
 
   createCard(data) {
@@ -18,12 +32,20 @@ class CrmKanbanAPI extends ApiClient {
     return axios.patch(`${this.url}/cards/${id}`, data);
   }
 
-  deleteCard(id) {
-    return axios.delete(`${this.url}/cards/${id}`);
+  deleteCard(id, params = {}) {
+    return axios.delete(`${this.url}/cards/${id}`, { params });
   }
 
   updateStage(id, data) {
     return axios.patch(`${this.url}/stages/${id}`, data);
+  }
+
+  createStage(data) {
+    return axios.post(`${this.url}/stages`, data);
+  }
+
+  deleteStage(id, params = {}) {
+    return axios.delete(`${this.url}/stages/${id}`, { params });
   }
 
   createActivity(cardId, data) {
@@ -34,8 +56,12 @@ class CrmKanbanAPI extends ApiClient {
     return axios.patch(`${this.url}/cards/${cardId}/activities/${activityId}`, data);
   }
 
-  completeActivity(cardId, activityId) {
-    return axios.post(`${this.url}/cards/${cardId}/activities/${activityId}/complete`);
+  completeActivity(cardId, activityId, params = {}) {
+    return axios.post(
+      `${this.url}/cards/${cardId}/activities/${activityId}/complete`,
+      null,
+      { params }
+    );
   }
 
   createWebhook(data) {

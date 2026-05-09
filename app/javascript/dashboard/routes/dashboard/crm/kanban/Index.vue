@@ -12,6 +12,8 @@ import captainTasksAPI from 'dashboard/api/captain/tasks';
 const route = useRoute();
 
 const pipeline = ref({});
+const pipelines = ref([]);
+const selectedPipelineId = ref(null);
 const stages = ref([]);
 const cards = ref([]);
 const metrics = ref({});
@@ -23,6 +25,8 @@ const isDetailOpen = ref(false);
 const draggedCardId = ref(null);
 const pendingCardMoveIds = ref([]);
 const isLoading = ref(false);
+const isPipelineOpen = ref(false);
+const isStageOpen = ref(false);
 const isRulesOpen = ref(false);
 const isWebhookOpen = ref(false);
 const isSearchingContacts = ref(false);
@@ -44,6 +48,19 @@ const cardForm = reactive({
 
 const rulesForm = reactive({
   ai_rules: '',
+});
+
+const pipelineForm = reactive({
+  id: null,
+  name: '',
+  description: '',
+});
+
+const stageForm = reactive({
+  name: '',
+  stale_after_days: 2,
+  win_probability: 10,
+  color: 'teal',
 });
 
 const activityForm = reactive({
@@ -97,12 +114,17 @@ const closeDetailPanel = () => {
 const loadBoard = async () => {
   isLoading.value = true;
   try {
+    const boardParams = selectedPipelineId.value
+      ? { pipeline_id: selectedPipelineId.value }
+      : {};
     const [boardResponse, productsResponse] = await Promise.all([
-      kanbanAPI.get(),
+      kanbanAPI.getBoard(boardParams),
       productsAPI.get(),
     ]);
 
     pipeline.value = boardResponse.data.pipeline;
+    pipelines.value = boardResponse.data.pipelines || [boardResponse.data.pipeline].filter(Boolean);
+    selectedPipelineId.value = pipeline.value?.id || null;
     stages.value = boardResponse.data.stages;
     cards.value = boardResponse.data.cards;
     metrics.value = boardResponse.data.metrics;
@@ -110,11 +132,110 @@ const loadBoard = async () => {
     products.value = productsResponse.data;
     rulesForm.ai_rules = pipeline.value.ai_rules || '';
 
-    if (!cardForm.stage_id) resetCardForm(null, false);
+    if (!stages.value.some(stage => String(stage.id) === String(cardForm.stage_id))) {
+      resetCardForm(null, false);
+    }
   } catch (error) {
     useAlert(error.message || 'Nao foi possivel carregar o Kanban.');
   } finally {
     isLoading.value = false;
+  }
+};
+
+const reloadCurrentBoard = async () => {
+  const response = await kanbanAPI.getBoard(
+    selectedPipelineId.value ? { pipeline_id: selectedPipelineId.value } : {}
+  );
+  pipeline.value = response.data.pipeline;
+  pipelines.value = response.data.pipelines || [];
+  selectedPipelineId.value = pipeline.value?.id || null;
+  stages.value = response.data.stages;
+  cards.value = response.data.cards;
+  metrics.value = response.data.metrics;
+  webhooks.value = response.data.webhooks || [];
+  rulesForm.ai_rules = pipeline.value.ai_rules || '';
+};
+
+const selectPipeline = async () => {
+  closeDetailPanel();
+  await loadBoard();
+};
+
+const openPipelineForm = (record = null) => {
+  Object.assign(pipelineForm, {
+    id: record?.id || null,
+    name: record?.name || '',
+    description: record?.description || '',
+  });
+  isPipelineOpen.value = true;
+};
+
+const savePipeline = async () => {
+  try {
+    const payload = {
+      pipeline: {
+        name: pipelineForm.name,
+        description: pipelineForm.description,
+      },
+    };
+
+    const response = pipelineForm.id
+      ? await kanbanAPI.updatePipeline(pipelineForm.id, payload)
+      : await kanbanAPI.createPipeline(payload);
+
+    pipeline.value = response.data.pipeline;
+    pipelines.value = response.data.pipelines || [];
+    selectedPipelineId.value = pipeline.value.id;
+    stages.value = response.data.stages;
+    cards.value = response.data.cards;
+    metrics.value = response.data.metrics;
+    webhooks.value = response.data.webhooks || [];
+    rulesForm.ai_rules = pipeline.value.ai_rules || '';
+    isPipelineOpen.value = false;
+    useAlert(pipelineForm.id ? 'Funil atualizado.' : 'Funil criado.');
+  } catch (error) {
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel salvar o funil.');
+  }
+};
+
+const deletePipeline = async () => {
+  if (!pipeline.value?.id) return;
+  if (!window.confirm(`Excluir o funil ${pipeline.value.name}?`)) return;
+
+  try {
+    const response = await kanbanAPI.deletePipeline(pipeline.value.id);
+    pipeline.value = response.data.pipeline;
+    pipelines.value = response.data.pipelines || [];
+    selectedPipelineId.value = pipeline.value.id;
+    stages.value = response.data.stages;
+    cards.value = response.data.cards;
+    metrics.value = response.data.metrics;
+    webhooks.value = response.data.webhooks || [];
+    rulesForm.ai_rules = pipeline.value.ai_rules || '';
+    closeDetailPanel();
+    useAlert('Funil excluido.');
+  } catch (error) {
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel excluir o funil.');
+  }
+};
+
+const createStage = async () => {
+  try {
+    await kanbanAPI.createStage({
+      pipeline_id: selectedPipelineId.value,
+      stage: { ...stageForm },
+    });
+    Object.assign(stageForm, {
+      name: '',
+      stale_after_days: 2,
+      win_probability: 10,
+      color: 'teal',
+    });
+    isStageOpen.value = false;
+    useAlert('Etapa criada.');
+    await reloadCurrentBoard();
+  } catch (error) {
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel criar a etapa.');
   }
 };
 
@@ -169,6 +290,7 @@ const resetActivityForm = () => {
 };
 
 const compactCardPayload = () => ({
+  pipeline_id: selectedPipelineId.value,
   card: {
     ...cardForm,
     contact_id: cardForm.contact_id || null,
@@ -216,7 +338,7 @@ const summarizeConversation = async () => {
 const deleteCard = async card => {
   if (!window.confirm(`Arquivar o card ${card.title}?`)) return;
 
-  await kanbanAPI.deleteCard(card.id);
+  await kanbanAPI.deleteCard(card.id, { pipeline_id: selectedPipelineId.value });
   useAlert('Card arquivado.');
   if (selectedCardId.value === card.id) closeDetailPanel();
   await loadBoard();
@@ -224,13 +346,15 @@ const deleteCard = async card => {
 
 const saveRules = async () => {
   try {
-    const response = await kanbanAPI.updatePipeline({
+    const response = await kanbanAPI.updatePipeline(pipeline.value.id, {
       pipeline: { ai_rules: rulesForm.ai_rules },
     });
     pipeline.value = response.data.pipeline;
+    pipelines.value = response.data.pipelines || [];
     stages.value = response.data.stages;
     cards.value = response.data.cards;
     metrics.value = response.data.metrics;
+    webhooks.value = response.data.webhooks || [];
     useAlert('Regras da IA atualizadas.');
   } catch (error) {
     useAlert(error.message || 'Nao foi possivel salvar as regras.');
@@ -243,6 +367,7 @@ const createActivity = async () => {
   isSavingActivity.value = true;
   try {
     await kanbanAPI.createActivity(selectedCard.value.id, {
+      pipeline_id: selectedPipelineId.value,
       activity: {
         ...activityForm,
         due_at: activityForm.due_at || null,
@@ -262,7 +387,9 @@ const createActivity = async () => {
 const completeActivity = async activity => {
   if (!selectedCard.value) return;
 
-  await kanbanAPI.completeActivity(selectedCard.value.id, activity.id);
+  await kanbanAPI.completeActivity(selectedCard.value.id, activity.id, {
+    pipeline_id: selectedPipelineId.value,
+  });
   useAlert('Atividade concluida.');
   await loadBoard();
 };
@@ -270,6 +397,7 @@ const completeActivity = async activity => {
 const createWebhook = async () => {
   try {
     await kanbanAPI.createWebhook({
+      pipeline_id: selectedPipelineId.value,
       webhook: {
         name: webhookForm.name,
         url: webhookForm.url,
@@ -299,6 +427,7 @@ const deleteWebhook = async webhook => {
 const updateStage = async stage => {
   try {
     await kanbanAPI.updateStage(stage.id, {
+      pipeline_id: selectedPipelineId.value,
       stage: {
         name: stage.name,
         stale_after_days: stage.stale_after_days,
@@ -309,6 +438,18 @@ const updateStage = async stage => {
     await loadBoard();
   } catch (error) {
     useAlert(error.message || 'Nao foi possivel salvar a etapa.');
+  }
+};
+
+const deleteStage = async stage => {
+  if (!window.confirm(`Excluir a etapa ${stage.name}?`)) return;
+
+  try {
+    await kanbanAPI.deleteStage(stage.id, { pipeline_id: selectedPipelineId.value });
+    useAlert('Etapa excluida.');
+    await reloadCurrentBoard();
+  } catch (error) {
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel excluir a etapa.');
   }
 };
 
@@ -330,9 +471,15 @@ const onDrop = async stage => {
   card.stage_changed_at = new Date().toISOString();
 
   try {
-    await kanbanAPI.updateCard(card.id, { card: { stage_id: stage.id } });
-    const response = await kanbanAPI.get();
+    await kanbanAPI.updateCard(card.id, {
+      pipeline_id: selectedPipelineId.value,
+      card: { stage_id: stage.id },
+    });
+    const response = await kanbanAPI.getBoard(
+      selectedPipelineId.value ? { pipeline_id: selectedPipelineId.value } : {}
+    );
     pipeline.value = response.data.pipeline;
+    pipelines.value = response.data.pipelines || [];
     stages.value = response.data.stages;
     cards.value = response.data.cards;
     metrics.value = response.data.metrics;
@@ -427,6 +574,84 @@ onMounted(loadBoard);
         </div>
       </div>
 
+      <div class="crm-pipeline-toolbar mt-4 flex flex-wrap items-end justify-between gap-3">
+        <label class="min-w-[240px] flex-1">
+          <span class="mb-1 block text-xs font-semibold uppercase text-n-slate-10">Funil ativo</span>
+          <select v-model="selectedPipelineId" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" @change="selectPipeline">
+            <option v-for="item in pipelines" :key="item.id" :value="item.id">
+              {{ item.name }}
+            </option>
+          </select>
+        </label>
+        <div class="crm-header-actions flex flex-wrap gap-2">
+          <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12" type="button" @click="openPipelineForm(pipeline)">
+            <span class="i-lucide-settings-2 size-4" />
+            Editar funil
+          </button>
+          <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12" type="button" @click="openPipelineForm()">
+            <span class="i-lucide-folder-plus size-4" />
+            Novo funil
+          </button>
+          <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12" type="button" @click="isStageOpen = !isStageOpen">
+            <span class="i-lucide-columns-3 size-4" />
+            Nova etapa
+          </button>
+          <button
+            class="rounded-md border border-n-ruby-7 px-3 py-2 text-sm text-n-ruby-10"
+            type="button"
+            :disabled="pipeline.default"
+            @click="deletePipeline"
+          >
+            <span class="i-lucide-trash-2 size-4" />
+            Excluir funil
+          </button>
+        </div>
+      </div>
+
+      <form v-if="isPipelineOpen" class="crm-config-panel mt-4 grid gap-3 border border-n-weak bg-n-solid-1 p-4 md:grid-cols-[1fr_1.3fr_auto]" @submit.prevent="savePipeline">
+        <label>
+          <span class="mb-1 block text-sm font-medium text-n-slate-12">Nome do funil</span>
+          <input v-model="pipelineForm.name" required class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
+        </label>
+        <label>
+          <span class="mb-1 block text-sm font-medium text-n-slate-12">Descricao</span>
+          <input v-model="pipelineForm.description" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
+        </label>
+        <div class="flex items-end gap-2">
+          <button class="rounded-md bg-n-blue-9 px-3 py-2 text-sm font-semibold text-white" type="submit">
+            <span class="i-lucide-save size-4" />
+            Salvar
+          </button>
+          <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12" type="button" @click="isPipelineOpen = false">
+            Cancelar
+          </button>
+        </div>
+      </form>
+
+      <form v-if="isStageOpen" class="crm-config-panel mt-4 grid gap-3 border border-n-weak bg-n-solid-1 p-4 md:grid-cols-[1fr_140px_140px_auto]" @submit.prevent="createStage">
+        <label>
+          <span class="mb-1 block text-sm font-medium text-n-slate-12">Nome da etapa</span>
+          <input v-model="stageForm.name" required class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" placeholder="Ex: Proposta aceita" />
+        </label>
+        <label>
+          <span class="mb-1 block text-sm font-medium text-n-slate-12">Parado apos</span>
+          <input v-model="stageForm.stale_after_days" type="number" min="0" required class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
+        </label>
+        <label>
+          <span class="mb-1 block text-sm font-medium text-n-slate-12">Chance %</span>
+          <input v-model="stageForm.win_probability" type="number" min="0" max="100" required class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
+        </label>
+        <div class="flex items-end gap-2">
+          <button class="rounded-md bg-n-blue-9 px-3 py-2 text-sm font-semibold text-white" type="submit">
+            <span class="i-lucide-plus size-4" />
+            Adicionar
+          </button>
+          <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12" type="button" @click="isStageOpen = false">
+            Cancelar
+          </button>
+        </div>
+      </form>
+
       <div class="crm-metrics mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
         <div class="crm-metric-card border border-n-weak bg-n-solid-1 p-3">
           <span class="crm-metric-icon i-lucide-panels-top-left" />
@@ -514,20 +739,29 @@ onMounted(loadBoard);
               <div class="flex items-start justify-between gap-3">
                 <div class="flex min-w-0 flex-1 items-center gap-2">
                   <span class="crm-stage-dot" />
-                  <input v-model="stage.name" class="min-w-0 flex-1 bg-transparent text-sm font-bold text-n-slate-12 outline-none" @change="updateStage(stage)" />
+                  <input v-model="stage.name" class="crm-stage-title min-w-0 flex-1 bg-transparent text-sm font-bold text-n-slate-12 outline-none" @change="updateStage(stage)" />
                 </div>
-                <span class="rounded-md bg-n-alpha-2 px-2.5 py-1 text-xs font-semibold text-n-blue-11">{{ visibleCards(stage.id).length }}</span>
+                <div class="flex shrink-0 items-center gap-2">
+                  <span class="rounded-md bg-n-alpha-2 px-2.5 py-1 text-xs font-semibold text-n-blue-11">{{ visibleCards(stage.id).length }}</span>
+                  <button class="crm-icon-button text-n-ruby-10" type="button" title="Excluir etapa" @click="deleteStage(stage)">
+                    <span class="i-lucide-trash-2 size-3.5" />
+                  </button>
+                </div>
               </div>
-              <div class="mt-2 grid grid-cols-2 gap-2 text-xs text-n-slate-11">
-                <label class="flex items-center gap-1">
-                  Parado
-                  <input v-model="stage.stale_after_days" type="number" min="0" class="w-14 rounded border border-n-weak bg-n-alpha-2 px-2 py-1" @change="updateStage(stage)" />
-                  d
+              <div class="crm-stage-settings mt-3 grid grid-cols-2 gap-3">
+                <label>
+                  <span>Parado apos</span>
+                  <div class="crm-stage-number">
+                    <input v-model="stage.stale_after_days" type="number" min="0" @change="updateStage(stage)" />
+                    <b>d</b>
+                  </div>
                 </label>
-                <label class="flex items-center gap-1">
-                  Chance
-                  <input v-model="stage.win_probability" type="number" min="0" max="100" class="w-14 rounded border border-n-weak bg-n-alpha-2 px-2 py-1" @change="updateStage(stage)" />
-                  %
+                <label>
+                  <span>Chance</span>
+                  <div class="crm-stage-number">
+                    <input v-model="stage.win_probability" type="number" min="0" max="100" @change="updateStage(stage)" />
+                    <b>%</b>
+                  </div>
                 </label>
               </div>
             </div>
@@ -584,6 +818,11 @@ onMounted(loadBoard);
               </button>
             </div>
           </section>
+
+          <button class="crm-add-stage flex w-[260px] shrink-0 flex-col items-center justify-center gap-2 border border-dashed border-n-weak bg-n-alpha-1 p-6 text-sm font-semibold text-n-slate-11 hover:border-n-blue-8 hover:bg-n-alpha-2 hover:text-n-blue-11" type="button" @click="isStageOpen = true">
+            <span class="i-lucide-columns-3 size-5" />
+            Adicionar etapa
+          </button>
         </div>
       </div>
 
@@ -997,6 +1236,65 @@ onMounted(loadBoard);
   box-shadow: 0 0 0 3px rgba(var(--alpha-1));
 }
 
+.crm-stage-title {
+  min-height: 2rem;
+  padding: 0.25rem 0.35rem;
+}
+
+.crm-stage-settings label {
+  min-width: 0;
+}
+
+.crm-stage-settings label > span {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: rgb(var(--slate-10));
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1rem;
+  text-transform: uppercase;
+}
+
+.crm-stage-number {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--crm-field-border);
+  border-radius: 0.5rem;
+  background: var(--crm-field-bg);
+}
+
+.crm-stage-number input {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.25rem;
+  border: 0;
+  background: transparent;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.crm-stage-number b {
+  padding-right: 0.6rem;
+  color: rgb(var(--slate-11));
+  font-size: 0.8125rem;
+}
+
+.crm-icon-button {
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid rgba(var(--border-container));
+  border-radius: 0.5rem;
+  background: rgba(var(--alpha-1));
+}
+
+.crm-add-stage {
+  min-height: 16rem;
+  border-radius: var(--crm-panel-radius);
+}
+
 .crm-deal-card {
   border-color: rgba(var(--border-container));
   background: rgb(var(--surface-2));
@@ -1075,10 +1373,12 @@ onMounted(loadBoard);
 }
 
 .crm-stage input,
+.crm-control,
 .crm-detail-panel input,
 .crm-detail-panel select,
 .crm-detail-panel textarea,
 .crm-config-panel input,
+.crm-config-panel select,
 .crm-config-panel textarea {
   min-height: 2.25rem;
   border-color: var(--crm-field-border);
@@ -1092,14 +1392,23 @@ onMounted(loadBoard);
 }
 
 .crm-stage input:focus,
+.crm-control:focus,
 .crm-detail-panel input:focus,
 .crm-detail-panel select:focus,
 .crm-detail-panel textarea:focus,
 .crm-config-panel input:focus,
+.crm-config-panel select:focus,
 .crm-config-panel textarea:focus {
   border-color: rgb(var(--border-blue-strong));
   background: var(--crm-field-bg-focus);
   box-shadow: 0 0 0 3px rgba(var(--border-blue));
+}
+
+.crm-stage .crm-stage-number input,
+.crm-stage .crm-stage-number input:focus {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .crm-detail-panel input::placeholder,
@@ -1120,6 +1429,11 @@ onMounted(loadBoard);
 
 .crm-detail-panel textarea {
   resize: vertical;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 :global(.dark) .crm-kanban-page {

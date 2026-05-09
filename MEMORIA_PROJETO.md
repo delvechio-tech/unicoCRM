@@ -238,7 +238,17 @@ Revisao visual aplicada em 2026-05-09:
   - Portainer stack `chatwoot` foi atualizada com `PullImage=true`;
   - `chatwoot_chatwoot_app` e `chatwoot_chatwoot_sidekiq` ficaram com update `completed` apontando para `delvechiotech/unicocrm:latest@sha256:82adb17f73679caf8447417fde30d256fa6640620d2107fd8f25f08502f4789b`;
   - `https://chat.unicocrm.com/` respondeu HTTP `200 OK` apos o deploy.
-- Nao houve alteracao intencional em APIs, payloads, controllers, jobs, models, migrations ou regras de negocio nesta frente visual.
+- Nova rodada de controle de funis/etapas do Kanban em 2026-05-09:
+  - API do Kanban agora aceita `pipeline_id` para carregar/alterar funis especificos e retorna a lista de funis disponiveis;
+  - foram adicionados endpoints para criar, renomear e excluir funis vazios, mantendo o funil padrao protegido;
+  - foram adicionados endpoints para criar e excluir etapas vazias, mantendo bloqueio quando houver cards para preservar historico;
+  - a UI ganhou seletor de funil, formulario de novo/editar funil, criacao de etapa e exclusao de etapa;
+  - cards, atividades, webhooks e drag/drop passam a enviar o `pipeline_id` selecionado, evitando cair no funil padrao ao trabalhar em outros funis;
+  - controles de etapa `Parado apos` e `Chance` foram redesenhados para nao truncar valores nem ficar desproporcionais;
+  - `git diff --check` passou nos arquivos alterados;
+  - `docker image build -f docker/Dockerfile -t delvechiotech/unicocrm:latest .` passou e gerou manifest list local `sha256:c573fde235b25b70380cb98a13ce77643f569636452011c802859978c6ca4414`;
+  - `docker image push delvechiotech/unicocrm:latest` passou e publicou `latest` com digest `sha256:c573fde235b25b70380cb98a13ce77643f569636452011c802859978c6ca4414`.
+- A rodada de controle de funis alterou apenas API/UI do Kanban; nao mexeu em mensageria Quepasa, listener de sync automatico, payload n8n ou tools de IA.
 - Validacoes executadas:
   - `git diff --check` nos arquivos visuais passou;
   - `docker build -f docker/Dockerfile -t delvechiotech/unicocrm:latest .` passou;

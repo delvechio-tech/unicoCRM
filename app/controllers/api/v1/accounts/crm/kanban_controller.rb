@@ -10,6 +10,35 @@ class Api::V1::Accounts::Crm::KanbanController < Api::V1::Accounts::BaseControll
     render json: board_payload
   end
 
+  def create_pipeline
+    record = Current.account.crm_kanban_pipelines.create!(
+      pipeline_params.merge(
+        default: false,
+        position: Current.account.crm_kanban_pipelines.maximum(:position).to_i + 1
+      )
+    )
+    record.ensure_default_stages!
+    @pipeline = record
+    render json: board_payload, status: :created
+  end
+
+  def update_pipeline
+    record = fetch_pipeline(params[:pipeline_id])
+    record.update!(pipeline_params)
+    @pipeline = record
+    render json: board_payload
+  end
+
+  def destroy_pipeline
+    record = fetch_pipeline(params[:pipeline_id])
+    return render_error('O funil padrao nao pode ser excluido.') if record.default?
+    return render_error('Arquive ou mova os cards antes de excluir este funil.') if record.cards.exists?
+
+    record.destroy!
+    @pipeline = Crm::KanbanPipeline.ensure_default_for!(Current.account)
+    render json: board_payload
+  end
+
   def create_card
     stage = fetch_stage(params.dig(:card, :stage_id))
     card = Current.account.crm_kanban_cards.create!(
@@ -61,6 +90,26 @@ class Api::V1::Accounts::Crm::KanbanController < Api::V1::Accounts::BaseControll
     render json: stage_payload(stage.reload)
   end
 
+  def create_stage
+    stage = pipeline.stages.create!(
+      stage_params.merge(
+        account: Current.account,
+        position: pipeline.stages.maximum(:position).to_i + 1
+      )
+    )
+    render json: stage_payload(stage), status: :created
+  end
+
+  def destroy_stage
+    stage = fetch_stage(params[:stage_id])
+    return render_error('O funil precisa ter pelo menos uma etapa.') if pipeline.stages.count <= 1
+    return render_error('Mova ou arquive os cards antes de excluir esta etapa.') if stage.cards.exists?
+
+    stage.destroy!
+    normalize_stage_positions!
+    head :ok
+  end
+
   def create_activity
     card = fetch_card
     activity = card.activities.create!(activity_params.merge(account: Current.account))
@@ -106,7 +155,14 @@ class Api::V1::Accounts::Crm::KanbanController < Api::V1::Accounts::BaseControll
   private
 
   def pipeline
-    @pipeline ||= Crm::KanbanPipeline.ensure_default_for!(Current.account)
+    @pipeline ||= begin
+      default_pipeline = Crm::KanbanPipeline.ensure_default_for!(Current.account)
+      params[:pipeline_id].present? ? fetch_pipeline(params[:pipeline_id]) : default_pipeline
+    end
+  end
+
+  def fetch_pipeline(pipeline_id)
+    Current.account.crm_kanban_pipelines.find(pipeline_id)
   end
 
   def fetch_stage(stage_id)
@@ -172,6 +228,16 @@ class Api::V1::Accounts::Crm::KanbanController < Api::V1::Accounts::BaseControll
     params.require(:webhook).permit(:name, :url, :access_token, :active, events: [])
   end
 
+  def normalize_stage_positions!
+    pipeline.stages.order(:position, :id).each_with_index do |stage, index|
+      stage.update_column(:position, index) if stage.position != index
+    end
+  end
+
+  def render_error(message)
+    render json: { error: message }, status: :unprocessable_entity
+  end
+
   def board_payload
     cards = pipeline.cards
                     .active
@@ -180,6 +246,7 @@ class Api::V1::Accounts::Crm::KanbanController < Api::V1::Accounts::BaseControll
 
     {
       pipeline: pipeline_payload(pipeline),
+      pipelines: Current.account.crm_kanban_pipelines.order(:position, :id).map { |record| pipeline_payload(record) },
       stages: pipeline.stages.order(:position).map { |stage| stage_payload(stage) },
       cards: cards.map { |card| card_payload(card) },
       webhooks: visible_webhooks.order(:created_at).map { |webhook| webhook_payload(webhook) },

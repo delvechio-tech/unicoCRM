@@ -242,6 +242,17 @@ Estado atual deste chat:
   - Portainer stack `chatwoot` foi atualizada com `PullImage=true`;
   - `chatwoot_chatwoot_app` e `chatwoot_chatwoot_sidekiq` ficaram com update `completed` apontando para `delvechiotech/unicocrm:latest@sha256:82adb17f73679caf8447417fde30d256fa6640620d2107fd8f25f08502f4789b`;
   - `https://chat.unicocrm.com/` respondeu HTTP `200 OK` apos o deploy.
+- Rodada atual de controle de funis/etapas:
+  - Kanban agora tem seletor de funil e controles para criar/editar/excluir funis;
+  - exclusao de funil protege o funil padrao e bloqueia funis com cards;
+  - colunas/etapas podem ser criadas, renomeadas, configuradas e excluidas quando estiverem vazias;
+  - controles `Parado apos` e `Chance` foram redesenhados para corrigir truncamento/desproporcao;
+  - backend do Kanban passou a aceitar `pipeline_id` para operar no funil selecionado;
+  - cards, atividades, webhooks e drag/drop enviam `pipeline_id` para nao cair no funil padrao;
+  - nao houve alteracao em Quepasa, listener de sync automatico, payload n8n ou tools de IA;
+  - `git diff --check` passou;
+  - `docker image build -f docker/Dockerfile -t delvechiotech/unicocrm:latest .` passou;
+  - `docker image push delvechiotech/unicocrm:latest` publicou digest `sha256:c573fde235b25b70380cb98a13ce77643f569636452011c802859978c6ca4414`.
 
 Arquivos sensiveis deste chat:
 

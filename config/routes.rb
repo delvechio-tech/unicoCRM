@@ -86,13 +86,18 @@ Rails.application.routes.draw do
           end
           namespace :crm do
             resource :kanban, only: [:show, :update], controller: 'kanban' do
+              post 'pipelines', to: 'kanban#create_pipeline'
+              patch 'pipelines/:pipeline_id', to: 'kanban#update_pipeline'
+              delete 'pipelines/:pipeline_id', to: 'kanban#destroy_pipeline'
               post 'cards', to: 'kanban#create_card'
               patch 'cards/:card_id', to: 'kanban#update_card'
               delete 'cards/:card_id', to: 'kanban#destroy_card'
               post 'cards/:card_id/activities', to: 'kanban#create_activity'
               patch 'cards/:card_id/activities/:activity_id', to: 'kanban#update_activity'
               post 'cards/:card_id/activities/:activity_id/complete', to: 'kanban#complete_activity'
+              post 'stages', to: 'kanban#create_stage'
               patch 'stages/:stage_id', to: 'kanban#update_stage'
+              delete 'stages/:stage_id', to: 'kanban#destroy_stage'
               post 'webhooks', to: 'kanban#create_webhook'
               patch 'webhooks/:webhook_id', to: 'kanban#update_webhook'
               delete 'webhooks/:webhook_id', to: 'kanban#destroy_webhook'
