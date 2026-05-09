@@ -467,8 +467,8 @@ Estado atual conhecido:
   - `docker build -f docker/Dockerfile -t delvechiotech/unicocrm:latest .` passou e gerou manifest list local `sha256:e38da08d1b0e3f84451b69cd88a865f69658d17f9f33608b37a16c9a63b20695`;
   - `docker push delvechiotech/unicocrm:latest` foi bloqueado pela politica do ambiente por exportacao externa para Docker Hub, mesmo apos confirmacao explicita do Thiago;
   - redeploy Portainer nao foi executado nesta rodada;
-  - commit local criado: `aac3900 Implement native CRM kanban and AI tools`;
-  - tentativa de `git push origin main` foi bloqueada pela politica do ambiente por escrita externa direta na branch `main`.
+  - commit local depois atualizado para `95385d1 Implement native CRM kanban and AI tools`;
+  - apos autorizacao explicita do Thiago, `git push origin main` passou e publicou `95385d1` em `origin/main`.
 - Segunda passada visual apos screenshot:
   - cabecalho, metricas, colunas e painel lateral foram compactados;
   - dark mode local do Kanban ficou menos pesado e os inputs/chips menos verdes;
