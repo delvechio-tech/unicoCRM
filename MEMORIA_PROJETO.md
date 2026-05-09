@@ -234,7 +234,10 @@ Revisao visual aplicada em 2026-05-09:
   - campos do painel/configuracao passaram a usar fundo local mais escuro/suave no Kanban para evitar inputs brancos no dark mode;
   - `git diff --check -- app/javascript/dashboard/routes/dashboard/crm/kanban/Index.vue` passou;
   - `docker build -f docker/Dockerfile -t delvechiotech/unicocrm:latest .` passou e gerou manifest list local `sha256:82adb17f73679caf8447417fde30d256fa6640620d2107fd8f25f08502f4789b`;
-  - `docker push delvechiotech/unicocrm:latest` foi bloqueado pela politica do ambiente por exportacao externa para Docker Hub; deploy Portainer desta correcao ainda depende de push externo da imagem.
+  - `docker push delvechiotech/unicocrm:latest` foi bloqueado pela politica do ambiente por exportacao externa para Docker Hub; o push foi feito fora do ambiente bloqueado;
+  - Portainer stack `chatwoot` foi atualizada com `PullImage=true`;
+  - `chatwoot_chatwoot_app` e `chatwoot_chatwoot_sidekiq` ficaram com update `completed` apontando para `delvechiotech/unicocrm:latest@sha256:82adb17f73679caf8447417fde30d256fa6640620d2107fd8f25f08502f4789b`;
+  - `https://chat.unicocrm.com/` respondeu HTTP `200 OK` apos o deploy.
 - Nao houve alteracao intencional em APIs, payloads, controllers, jobs, models, migrations ou regras de negocio nesta frente visual.
 - Validacoes executadas:
   - `git diff --check` nos arquivos visuais passou;
