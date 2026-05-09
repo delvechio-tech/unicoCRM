@@ -473,7 +473,11 @@ Estado atual conhecido:
   - cabecalho, metricas, colunas e painel lateral foram compactados;
   - dark mode local do Kanban ficou menos pesado e os inputs/chips menos verdes;
   - `docker build -f docker/Dockerfile -t delvechiotech/unicocrm:latest .` passou com manifest list local `sha256:a5daeef4e0ddd209035d2b50d69daa072ea5c656f0bea8289e296befd4058a86`;
-  - `docker push delvechiotech/unicocrm:latest` foi novamente bloqueado pela politica do ambiente por exportacao externa para Docker Hub; deploy Portainer nao foi executado.
+  - `docker push delvechiotech/unicocrm:latest` foi inicialmente bloqueado pela politica do ambiente por exportacao externa para Docker Hub;
+  - Thiago executou o push da imagem fora do ambiente bloqueado;
+  - Portainer stack `chatwoot` foi atualizada com `PullImage=true`;
+  - `chatwoot_chatwoot_app` e `chatwoot_chatwoot_sidekiq` ficaram com update `completed` apontando para `delvechiotech/unicocrm:latest@sha256:a5daeef4e0ddd209035d2b50d69daa072ea5c656f0bea8289e296befd4058a86`;
+  - houve `502` temporario durante boot, resolvido apos aguardar; `https://chat.unicocrm.com/` respondeu HTTP `200 OK`.
 
 Arquivos sensiveis:
 
