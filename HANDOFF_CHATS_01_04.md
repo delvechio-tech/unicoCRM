@@ -478,6 +478,11 @@ Estado atual conhecido:
   - Portainer stack `chatwoot` foi atualizada com `PullImage=true`;
   - `chatwoot_chatwoot_app` e `chatwoot_chatwoot_sidekiq` ficaram com update `completed` apontando para `delvechiotech/unicocrm:latest@sha256:a5daeef4e0ddd209035d2b50d69daa072ea5c656f0bea8289e296befd4058a86`;
   - houve `502` temporario durante boot, resolvido apos aguardar; `https://chat.unicocrm.com/` respondeu HTTP `200 OK`.
+- Ajuste posterior do Kanban:
+  - painel lateral fica fechado por padrao, abre por `Novo card`, `Adicionar nesta etapa` ou clique em card, e fecha apos salvar/arquivar;
+  - inputs do Kanban receberam fundo local mais escuro/suave para evitar campos brancos no dark mode;
+  - build Docker passou com manifest list local `sha256:82adb17f73679caf8447417fde30d256fa6640620d2107fd8f25f08502f4789b`;
+  - Docker push foi bloqueado pela politica do ambiente; deploy depende de push externo da imagem.
 
 Arquivos sensiveis:
 

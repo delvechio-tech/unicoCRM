@@ -19,6 +19,7 @@ const products = ref([]);
 const webhooks = ref([]);
 const contactResults = ref([]);
 const selectedCardId = ref(null);
+const isDetailOpen = ref(false);
 const draggedCardId = ref(null);
 const pendingCardMoveIds = ref([]);
 const isLoading = ref(false);
@@ -71,8 +72,9 @@ const visibleCards = stageId =>
 const normalizeList = response =>
   response?.data?.payload || response?.data?.data || response?.data || [];
 
-const resetCardForm = stageId => {
+const resetCardForm = (stageId, shouldOpen = true) => {
   selectedCardId.value = null;
+  isDetailOpen.value = shouldOpen;
   Object.assign(cardForm, {
     title: '',
     stage_id: stageId || stages.value[0]?.id || null,
@@ -85,6 +87,11 @@ const resetCardForm = stageId => {
     notes: '',
     status: 'open',
   });
+};
+
+const closeDetailPanel = () => {
+  selectedCardId.value = null;
+  isDetailOpen.value = false;
 };
 
 const loadBoard = async () => {
@@ -103,7 +110,7 @@ const loadBoard = async () => {
     products.value = productsResponse.data;
     rulesForm.ai_rules = pipeline.value.ai_rules || '';
 
-    if (!cardForm.stage_id) resetCardForm();
+    if (!cardForm.stage_id) resetCardForm(null, false);
   } catch (error) {
     useAlert(error.message || 'Nao foi possivel carregar o Kanban.');
   } finally {
@@ -137,6 +144,7 @@ const selectContact = contact => {
 
 const editCard = card => {
   selectedCardId.value = card.id;
+  isDetailOpen.value = true;
   Object.assign(cardForm, {
     title: card.title || '',
     stage_id: card.stage_id,
@@ -179,7 +187,7 @@ const saveCard = async () => {
       await kanbanAPI.createCard(compactCardPayload());
       useAlert('Card criado.');
     }
-    resetCardForm(cardForm.stage_id);
+    closeDetailPanel();
     await loadBoard();
   } catch (error) {
     useAlert(error.message || 'Nao foi possivel salvar o card.');
@@ -210,7 +218,7 @@ const deleteCard = async card => {
 
   await kanbanAPI.deleteCard(card.id);
   useAlert('Card arquivado.');
-  if (selectedCardId.value === card.id) resetCardForm();
+  if (selectedCardId.value === card.id) closeDetailPanel();
   await loadBoard();
 };
 
@@ -487,7 +495,10 @@ onMounted(loadBoard);
       </section>
     </header>
 
-    <section class="crm-workspace grid min-h-0 flex-1 grid-cols-1 overflow-hidden xl:grid-cols-[minmax(0,1fr)_360px]">
+    <section
+      class="crm-workspace grid min-h-0 flex-1 grid-cols-1 overflow-hidden"
+      :class="{ 'xl:grid-cols-[minmax(0,1fr)_360px]': isDetailOpen }"
+    >
       <div class="crm-board-scroll min-h-0 overflow-x-auto p-5">
         <div v-if="isLoading" class="text-sm text-n-slate-11">Carregando Kanban...</div>
         <div v-else class="crm-board-row flex min-h-full gap-5">
@@ -576,13 +587,18 @@ onMounted(loadBoard);
         </div>
       </div>
 
-      <aside class="crm-detail-panel min-h-0 overflow-y-auto border-l border-n-weak bg-n-solid-1 p-5">
+      <aside
+        v-if="isDetailOpen"
+        class="crm-detail-panel min-h-0 overflow-y-auto border-l border-n-weak bg-n-solid-1 p-5"
+      >
         <div class="mb-4 flex items-center justify-between gap-3">
           <div>
             <h2 class="text-lg font-semibold text-n-slate-12">{{ selectedCard ? 'Editar card' : 'Novo card' }}</h2>
             <p class="text-sm text-n-slate-11">Cliente, conversa, agenda e contexto comercial.</p>
           </div>
-          <button v-if="selectedCard" class="text-sm text-n-blue-text" type="button" @click="resetCardForm(cardForm.stage_id)">Limpar</button>
+          <button class="text-sm text-n-blue-text" type="button" @click="closeDetailPanel">
+            Fechar
+          </button>
         </div>
 
         <section v-if="selectedCard" class="mb-5 space-y-3 border border-n-weak bg-n-alpha-1 p-3">
@@ -788,9 +804,11 @@ onMounted(loadBoard);
   --crm-page-padding: clamp(0.875rem, 1.35vw, 1.25rem);
   --crm-shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.05);
   --crm-stage-accent: rgb(var(--blue-9));
+  --crm-field-bg: rgba(15, 118, 110, 0.065);
+  --crm-field-bg-focus: rgb(var(--surface-2));
+  --crm-field-border: rgba(var(--border-container));
   --alpha-1: 15, 118, 110, 0.055;
   --alpha-2: 15, 118, 110, 0.075;
-  --background-input-box: 255, 255, 255, 0.82;
 }
 
 .crm-page-header {
@@ -1063,7 +1081,9 @@ onMounted(loadBoard);
 .crm-config-panel input,
 .crm-config-panel textarea {
   min-height: 2.25rem;
-  background: rgba(var(--background-input-box));
+  border-color: var(--crm-field-border);
+  background: var(--crm-field-bg);
+  color: rgb(var(--slate-12));
   outline: none;
   transition:
     border-color 160ms ease,
@@ -1078,8 +1098,15 @@ onMounted(loadBoard);
 .crm-config-panel input:focus,
 .crm-config-panel textarea:focus {
   border-color: rgb(var(--border-blue-strong));
-  background: rgb(var(--surface-2));
+  background: var(--crm-field-bg-focus);
   box-shadow: 0 0 0 3px rgba(var(--border-blue));
+}
+
+.crm-detail-panel input::placeholder,
+.crm-detail-panel textarea::placeholder,
+.crm-config-panel input::placeholder,
+.crm-config-panel textarea::placeholder {
+  color: rgb(var(--slate-10));
 }
 
 .crm-detail-panel form {
@@ -1108,7 +1135,9 @@ onMounted(loadBoard);
   --alpha-1: 255, 255, 255, 0.045;
   --alpha-2: 255, 255, 255, 0.06;
   --alpha-3: 30, 32, 34, 0.96;
-  --background-input-box: 255, 255, 255, 0.045;
+  --crm-field-bg: rgba(255, 255, 255, 0.055);
+  --crm-field-bg-focus: rgba(255, 255, 255, 0.08);
+  --crm-field-border: rgba(255, 255, 255, 0.1);
   --label-background: 255 255 255;
   --label-border: 255, 255, 255, 0.075;
 }

@@ -228,6 +228,13 @@ Revisao visual aplicada em 2026-05-09:
   - Portainer stack `chatwoot` foi atualizada com `PullImage=true`;
   - `chatwoot_chatwoot_app` e `chatwoot_chatwoot_sidekiq` ficaram com update `completed` apontando para `delvechiotech/unicocrm:latest@sha256:a5daeef4e0ddd209035d2b50d69daa072ea5c656f0bea8289e296befd4058a86`;
   - houve `502` temporario durante boot, resolvido apos aguardar; `https://chat.unicocrm.com/` respondeu HTTP `200 OK`.
+- Ajuste posterior do Kanban em 2026-05-09:
+  - painel lateral de card agora fica fechado por padrao e abre apenas ao clicar em `Novo card`, `Adicionar nesta etapa` ou em um card existente;
+  - apos salvar ou arquivar, o painel fecha para devolver espaco ao board;
+  - campos do painel/configuracao passaram a usar fundo local mais escuro/suave no Kanban para evitar inputs brancos no dark mode;
+  - `git diff --check -- app/javascript/dashboard/routes/dashboard/crm/kanban/Index.vue` passou;
+  - `docker build -f docker/Dockerfile -t delvechiotech/unicocrm:latest .` passou e gerou manifest list local `sha256:82adb17f73679caf8447417fde30d256fa6640620d2107fd8f25f08502f4789b`;
+  - `docker push delvechiotech/unicocrm:latest` foi bloqueado pela politica do ambiente por exportacao externa para Docker Hub; deploy Portainer desta correcao ainda depende de push externo da imagem.
 - Nao houve alteracao intencional em APIs, payloads, controllers, jobs, models, migrations ou regras de negocio nesta frente visual.
 - Validacoes executadas:
   - `git diff --check` nos arquivos visuais passou;
