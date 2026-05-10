@@ -564,22 +564,21 @@ onMounted(loadBoard);
 <template>
   <main class="crm-kanban-page flex h-full min-h-0 flex-1 flex-col bg-n-background">
     <header class="crm-page-header border-b border-n-weak px-6 py-4">
-      <div class="crm-title-row flex flex-wrap items-center justify-between gap-4">
-        <div class="min-w-0">
-          <div class="mb-2 flex items-center gap-3">
-            <span class="crm-app-mark">U</span>
-            <h1 class="truncate text-2xl font-semibold text-n-slate-12">
-              {{ pipeline.name || 'Kanban comercial' }}
-            </h1>
+      <div class="crm-title-row flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div class="mb-2 flex items-center gap-2">
+            <span class="crm-eyebrow">CRM Pipeline</span>
             <span class="crm-live-pill">
-              <span class="i-lucide-info size-3.5" />
+              <span class="i-lucide-radio size-3.5" />
+              Sync ativo
             </span>
           </div>
-          <p class="crm-page-subtitle max-w-3xl text-sm text-n-slate-11">
-            {{ pipeline.description || 'Oportunidades, conversas e proximas acoes no mesmo fluxo.' }}
+          <h1 class="text-2xl font-semibold text-n-slate-12">Kanban comercial</h1>
+          <p class="crm-page-subtitle mt-1 max-w-3xl text-sm text-n-slate-11">
+            Oportunidades, conversas e proximas acoes no mesmo fluxo.
           </p>
         </div>
-        <div class="crm-top-actions flex flex-wrap gap-2">
+        <div class="crm-header-actions flex flex-wrap gap-2">
           <button
             class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12"
             :class="{ 'bg-n-alpha-2 text-n-blue-11': isMetricsOpen }"
@@ -587,42 +586,45 @@ onMounted(loadBoard);
             @click="isMetricsOpen = !isMetricsOpen"
           >
             <span class="i-lucide-bar-chart-3 size-4" />
-            Metricas - {{ metrics.total_cards || 0 }} ativos
+            Metricas · {{ metrics.total_cards || 0 }} ativos
           </button>
           <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12" type="button" @click="isRulesOpen = !isRulesOpen">
-            <span class="i-lucide-bot size-4" />
-            Automatizar
+            <span class="i-lucide-sparkles size-4" />
+            Regras da IA
           </button>
           <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12" type="button" @click="isWebhookOpen = !isWebhookOpen">
-            <span class="i-lucide-globe-2 size-4" />
+            <span class="i-lucide-webhook size-4" />
             Webhooks
           </button>
-          <button class="crm-primary-action rounded-md bg-n-blue-9 px-3 py-2 text-sm font-semibold text-white" type="button" @click="resetCardForm()">
+          <button class="rounded-md bg-n-blue-9 px-3 py-2 text-sm font-semibold text-white" type="button" @click="resetCardForm()">
             <span class="i-lucide-plus size-4" />
             Novo card
           </button>
         </div>
       </div>
 
-      <div class="crm-pipe-switcher mt-4 flex flex-wrap items-center justify-between gap-3">
-        <div class="crm-pipe-tabs flex min-w-0 flex-wrap items-center gap-1">
-        <label class="crm-pipe-select">
-          <span class="i-lucide-arrow-left-right size-4" />
-          <select v-model="selectedPipelineId" @change="selectPipeline">
+      <div class="crm-pipeline-toolbar mt-4 flex flex-wrap items-end justify-between gap-3">
+        <label class="min-w-[240px] flex-1">
+          <span class="mb-1 block text-xs font-semibold uppercase text-n-slate-10">Funil ativo</span>
+          <select v-model="selectedPipelineId" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" @change="selectPipeline">
             <option v-for="item in pipelines" :key="item.id" :value="item.id">
               {{ item.name }}
             </option>
           </select>
         </label>
-          <button type="button" class="is-active">Kanban</button>
-          <button type="button" @click="isStageOpen = !isStageOpen">Etapas</button>
-          <button type="button" @click="isMetricsOpen = !isMetricsOpen">Metricas</button>
-          <button type="button" @click="openPipelineForm(pipeline)">Configurar</button>
-          <button type="button" @click="openPipelineForm()">Novo funil</button>
-        </div>
-        <div class="crm-board-search">
-          <span class="i-lucide-search size-4" />
-          <span>Procurar cards</span>
+        <div class="crm-header-actions flex flex-wrap gap-2">
+          <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12" type="button" @click="openPipelineForm(pipeline)">
+            <span class="i-lucide-settings-2 size-4" />
+            Configurar funil
+          </button>
+          <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12" type="button" @click="openPipelineForm()">
+            <span class="i-lucide-folder-plus size-4" />
+            Novo funil
+          </button>
+          <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12" type="button" @click="isStageOpen = !isStageOpen">
+            <span class="i-lucide-columns-3 size-4" />
+            Etapas
+          </button>
         </div>
       </div>
 
@@ -816,16 +818,14 @@ onMounted(loadBoard);
             @dragover.prevent
             @drop="onDrop(stage)"
           >
-            <div class="crm-stage-header border-b border-n-weak p-4">
-              <div class="flex items-center justify-between gap-3">
+            <div class="border-b border-n-weak p-4">
+              <div class="flex items-start justify-between gap-3">
                 <div class="flex min-w-0 flex-1 items-center gap-2">
+                  <span class="crm-stage-dot" />
                   <input v-model="stage.name" class="crm-stage-title min-w-0 flex-1 bg-transparent text-sm font-bold text-n-slate-12 outline-none" @change="updateStage(stage)" />
-                  <span class="crm-stage-count">{{ visibleCards(stage.id).length }}</span>
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
-                  <button class="crm-stage-add-button" type="button" title="Adicionar card" @click="resetCardForm(stage.id)">
-                    <span class="i-lucide-plus size-4" />
-                  </button>
+                  <span class="rounded-md bg-n-alpha-2 px-2.5 py-1 text-xs font-semibold text-n-blue-11">{{ visibleCards(stage.id).length }}</span>
                 </div>
               </div>
             </div>
@@ -883,7 +883,7 @@ onMounted(loadBoard);
                 </p>
               </article>
 
-              <button class="crm-add-card-bottom w-full rounded-md border border-dashed border-n-weak px-3 py-2.5 text-sm font-medium text-n-slate-11 hover:border-n-blue-8 hover:bg-n-alpha-2 hover:text-n-blue-11" type="button" @click="resetCardForm(stage.id)">
+              <button class="w-full rounded-md border border-dashed border-n-weak px-3 py-2.5 text-sm font-medium text-n-slate-11 hover:border-n-blue-8 hover:bg-n-alpha-2 hover:text-n-blue-11" type="button" @click="resetCardForm(stage.id)">
                 <span class="i-lucide-plus size-4" />
                 Adicionar nesta etapa
               </button>
@@ -1597,297 +1597,6 @@ button:disabled {
 
 :global(.dark) .crm-contact-avatar {
   background: rgba(255, 91, 37, 0.12);
-}
-
-.crm-kanban-page {
-  color: #172b4d;
-  background: #f4f6f8;
-}
-
-.crm-page-header {
-  background: #ffffff;
-  border-color: #dfe5ec;
-  padding-bottom: 0;
-}
-
-.crm-title-row h1 {
-  color: #0f172a;
-  font-size: 1.35rem;
-  font-weight: 750;
-  letter-spacing: 0;
-}
-
-.crm-page-subtitle {
-  color: #5d6b7a;
-}
-
-.crm-app-mark {
-  display: inline-flex;
-  width: 3rem;
-  height: 3rem;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.5rem;
-  background: #fff0e9;
-  color: #d94912;
-  font-size: 1rem;
-  font-weight: 800;
-}
-
-.crm-top-actions button {
-  display: inline-flex;
-  min-height: 2.25rem;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  border: 0;
-  border-radius: 0.5rem;
-  background: transparent;
-  padding: 0 0.75rem;
-  color: #334155;
-  font-size: 0.875rem;
-  font-weight: 650;
-}
-
-.crm-top-actions button:hover {
-  background: #eef2f7;
-  color: #0f172a;
-}
-
-.crm-top-actions .crm-primary-action {
-  background: #0b63f6;
-  color: #ffffff;
-}
-
-.crm-top-actions .crm-primary-action:hover {
-  background: #0757d8;
-  color: #ffffff;
-}
-
-.crm-pipe-switcher {
-  margin-inline: calc(var(--crm-page-padding) * -1);
-  padding: 0.65rem var(--crm-page-padding) 0;
-  border-top: 1px solid #edf1f5;
-}
-
-.crm-pipe-tabs button,
-.crm-pipe-select {
-  display: inline-flex;
-  min-height: 2.75rem;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  padding: 0 1rem;
-  color: #334155;
-  font-size: 0.9375rem;
-  font-weight: 650;
-  white-space: nowrap;
-}
-
-.crm-pipe-tabs button {
-  border-bottom: 3px solid transparent;
-}
-
-.crm-pipe-tabs button:hover {
-  color: #0f172a;
-}
-
-.crm-pipe-tabs button.is-active {
-  border-bottom-color: #0f172a;
-  color: #0f172a;
-}
-
-.crm-pipe-select {
-  border-radius: 999px;
-  background: #eef2f7;
-  color: #0f172a;
-}
-
-.crm-pipe-select select {
-  max-width: 14rem;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font-weight: 700;
-  outline: none;
-}
-
-.crm-board-search {
-  display: inline-flex;
-  min-width: min(100%, 17rem);
-  min-height: 2.75rem;
-  align-items: center;
-  gap: 0.65rem;
-  border: 1px solid #d7dee8;
-  border-radius: 999px;
-  background: #ffffff;
-  padding: 0 1rem;
-  color: #94a3b8;
-  font-size: 0.9375rem;
-}
-
-.crm-workspace,
-:global(.dark) .crm-workspace {
-  background: #eef2f5;
-}
-
-.crm-board-scroll {
-  padding: 1.5rem var(--crm-page-padding) 0.75rem;
-}
-
-.crm-board-row {
-  gap: 0.75rem;
-}
-
-.crm-stage,
-:global(.dark) .crm-stage {
-  width: 26.25rem;
-  border-color: #d7dee8;
-  border-radius: 0.375rem;
-  background: #eef2f5;
-  box-shadow: none;
-}
-
-.crm-stage::before {
-  display: block;
-  height: 4px;
-  background: var(--crm-stage-accent);
-  content: '';
-}
-
-.crm-stage.accent-green {
-  --crm-stage-accent: #d19a00;
-}
-
-.crm-stage.accent-blue {
-  --crm-stage-accent: #5b2fc6;
-}
-
-.crm-stage.accent-amber {
-  --crm-stage-accent: #df1111;
-}
-
-.crm-stage.accent-violet {
-  --crm-stage-accent: #00889a;
-}
-
-.crm-stage.accent-teal {
-  --crm-stage-accent: #0b8f6b;
-}
-
-.crm-stage.accent-ruby {
-  --crm-stage-accent: #c026d3;
-}
-
-.crm-stage-header {
-  background: #ffffff;
-  border-color: #d7dee8;
-  padding: 0.85rem 1rem;
-}
-
-.crm-stage-title,
-.crm-stage .crm-stage-title,
-.crm-stage .crm-stage-title:focus {
-  color: var(--crm-stage-accent);
-  font-size: 1.05rem;
-  font-weight: 800;
-}
-
-.crm-stage-count {
-  display: inline-flex;
-  min-width: 1.65rem;
-  height: 1.65rem;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.5rem;
-  background: #edf2f7;
-  color: #1e293b;
-  font-size: 0.8125rem;
-  font-weight: 750;
-}
-
-.crm-stage-add-button {
-  width: 2rem;
-  height: 2rem;
-  border: 0;
-  border-radius: 0.375rem;
-  background: transparent;
-  color: #64748b;
-}
-
-.crm-stage-add-button:hover {
-  background: #eef2f7;
-  color: #0f172a;
-}
-
-.crm-stage > div:last-child {
-  padding: 0.75rem;
-}
-
-.crm-deal-card,
-:global(.dark) .crm-deal-card {
-  border-color: #e2e8f0;
-  border-radius: 0.375rem;
-  background: #ffffff;
-  padding: 0.9rem;
-  color: #0f172a;
-  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.12);
-}
-
-.crm-deal-card:hover,
-:global(.dark) .crm-deal-card:hover {
-  border-color: #cbd5e1;
-  background: #ffffff;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.1);
-}
-
-.crm-deal-card h3,
-.crm-deal-card a,
-.crm-deal-card .text-n-slate-12 {
-  color: #0f172a;
-}
-
-.crm-deal-card p,
-.crm-deal-card .text-n-slate-11 {
-  color: #475569;
-}
-
-.crm-card-chip,
-:global(.dark) .crm-card-chip {
-  border: 0;
-  background: #e8eef6;
-  color: #334155;
-  font-weight: 700;
-}
-
-.crm-product-availability.is-success,
-.crm-product-availability.is-warning,
-.crm-product-availability.is-danger,
-.crm-product-availability.is-info {
-  color: #111827;
-}
-
-.crm-contact-avatar,
-:global(.dark) .crm-contact-avatar {
-  border-color: #c7d2fe;
-  background: #eef2ff;
-  color: #3730a3;
-}
-
-.crm-add-card-bottom {
-  display: none;
-}
-
-.crm-add-stage {
-  min-height: 12rem;
-  border-color: #cbd5e1;
-  border-radius: 0.375rem;
-  background: #ffffff;
-  color: #334155;
 }
 
 @media (max-width: 1279px) {
