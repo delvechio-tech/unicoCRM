@@ -562,7 +562,7 @@ onMounted(loadBoard);
 </script>
 
 <template>
-  <main class="crm-kanban-page flex h-full min-h-0 w-full flex-1 flex-col bg-n-background">
+  <main class="crm-kanban-page flex h-full min-h-0 flex-1 flex-col bg-n-background">
     <header class="crm-page-header border-b border-n-weak px-6 py-4">
       <div class="crm-title-row flex flex-wrap items-center justify-between gap-4">
         <div class="min-w-0">
@@ -1119,16 +1119,9 @@ onMounted(loadBoard);
   --crm-field-border: rgb(var(--border-weak));
   --alpha-1: 255, 255, 255, 0.045;
   --alpha-2: 255, 255, 255, 0.065;
-  width: 100%;
-  max-width: none;
-  min-width: 0;
-  overflow: hidden;
-  align-self: stretch;
 }
 
 .crm-page-header {
-  width: 100%;
-  min-width: 0;
   padding: var(--crm-page-padding);
   background: rgb(var(--background-color));
 }
@@ -1250,14 +1243,10 @@ onMounted(loadBoard);
 }
 
 .crm-workspace {
-  width: 100%;
-  min-width: 0;
   background: rgb(var(--background-color));
 }
 
 .crm-board-scroll {
-  width: 100%;
-  min-width: 0;
   padding: var(--crm-page-padding);
   scrollbar-color: rgba(var(--border-container)) transparent;
   scrollbar-width: thin;
@@ -1752,9 +1741,6 @@ button:disabled {
 
 .crm-board-row {
   gap: 0.75rem;
-  width: max-content;
-  min-width: 100%;
-  align-items: stretch;
 }
 
 .crm-stage,
