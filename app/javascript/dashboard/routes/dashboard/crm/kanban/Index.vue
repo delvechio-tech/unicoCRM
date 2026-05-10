@@ -27,6 +27,7 @@ const pendingCardMoveIds = ref([]);
 const isLoading = ref(false);
 const isPipelineOpen = ref(false);
 const isStageOpen = ref(false);
+const isMetricsOpen = ref(false);
 const isRulesOpen = ref(false);
 const isWebhookOpen = ref(false);
 const isSearchingContacts = ref(false);
@@ -518,6 +519,25 @@ const formatMoney = (amount, currency = 'BRL') => {
   }).format(Number(amount));
 };
 
+const productAvailabilityLabel = product => {
+  if (!product) return '';
+  if (product.availability_status === 'discontinued') return 'Descontinuado';
+  if (product.availability_status === 'out_of_stock') return 'Sem estoque';
+  if (product.availability_status === 'pre_order') return 'Pre-venda';
+  if (product.low_stock) return 'Estoque baixo';
+  if (product.track_inventory) return `Disp. ${product.available_quantity}`;
+  return 'Disponivel';
+};
+
+const productAvailabilityClass = product => {
+  if (!product) return '';
+  if (product.availability_status === 'out_of_stock') return 'is-danger';
+  if (product.availability_status === 'discontinued') return 'is-muted';
+  if (product.low_stock) return 'is-warning';
+  if (product.availability_status === 'pre_order') return 'is-info';
+  return 'is-success';
+};
+
 const formatDateTime = value => {
   if (!value) return 'Sem data';
 
@@ -559,6 +579,15 @@ onMounted(loadBoard);
           </p>
         </div>
         <div class="crm-header-actions flex flex-wrap gap-2">
+          <button
+            class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12"
+            :class="{ 'bg-n-alpha-2 text-n-blue-11': isMetricsOpen }"
+            type="button"
+            @click="isMetricsOpen = !isMetricsOpen"
+          >
+            <span class="i-lucide-bar-chart-3 size-4" />
+            Metricas · {{ metrics.total_cards || 0 }} ativos
+          </button>
           <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12" type="button" @click="isRulesOpen = !isRulesOpen">
             <span class="i-lucide-sparkles size-4" />
             Regras da IA
@@ -586,7 +615,7 @@ onMounted(loadBoard);
         <div class="crm-header-actions flex flex-wrap gap-2">
           <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12" type="button" @click="openPipelineForm(pipeline)">
             <span class="i-lucide-settings-2 size-4" />
-            Editar funil
+            Configurar funil
           </button>
           <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12" type="button" @click="openPipelineForm()">
             <span class="i-lucide-folder-plus size-4" />
@@ -594,65 +623,119 @@ onMounted(loadBoard);
           </button>
           <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12" type="button" @click="isStageOpen = !isStageOpen">
             <span class="i-lucide-columns-3 size-4" />
-            Nova etapa
-          </button>
-          <button
-            class="rounded-md border border-n-ruby-7 px-3 py-2 text-sm text-n-ruby-10"
-            type="button"
-            :disabled="pipeline.default"
-            @click="deletePipeline"
-          >
-            <span class="i-lucide-trash-2 size-4" />
-            Excluir funil
+            Etapas
           </button>
         </div>
       </div>
 
-      <form v-if="isPipelineOpen" class="crm-config-panel mt-4 grid gap-3 border border-n-weak bg-n-solid-1 p-4 md:grid-cols-[1fr_1.3fr_auto]" @submit.prevent="savePipeline">
-        <label>
-          <span class="mb-1 block text-sm font-medium text-n-slate-12">Nome do funil</span>
-          <input v-model="pipelineForm.name" required class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
-        </label>
-        <label>
-          <span class="mb-1 block text-sm font-medium text-n-slate-12">Descricao</span>
-          <input v-model="pipelineForm.description" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
-        </label>
-        <div class="flex items-end gap-2">
-          <button class="rounded-md bg-n-blue-9 px-3 py-2 text-sm font-semibold text-white" type="submit">
-            <span class="i-lucide-save size-4" />
-            Salvar
-          </button>
-          <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12" type="button" @click="isPipelineOpen = false">
-            Cancelar
+      <form v-if="isPipelineOpen" class="crm-config-panel mt-4 border border-n-weak bg-n-solid-1 p-4" @submit.prevent="savePipeline">
+        <div class="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h2 class="text-sm font-semibold tracking-tight text-n-slate-12">
+              {{ pipelineForm.id ? 'Configuracao do funil' : 'Novo funil' }}
+            </h2>
+            <p class="mt-1 text-xs text-n-slate-11">
+              Ajustes administrativos ficam aqui para manter o board limpo.
+            </p>
+          </div>
+          <button class="text-sm text-n-slate-11 hover:text-n-slate-12" type="button" @click="isPipelineOpen = false">
+            Fechar
           </button>
         </div>
+        <div class="grid gap-3 md:grid-cols-[1fr_1.3fr_auto]">
+          <label>
+            <span class="mb-1 block text-sm font-medium text-n-slate-12">Nome do funil</span>
+            <input v-model="pipelineForm.name" required class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
+          </label>
+          <label>
+            <span class="mb-1 block text-sm font-medium text-n-slate-12">Descricao</span>
+            <input v-model="pipelineForm.description" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
+          </label>
+          <div class="flex items-end gap-2">
+            <button class="rounded-md bg-n-blue-9 px-3 py-2 text-sm font-semibold text-white" type="submit">
+              <span class="i-lucide-save size-4" />
+              Salvar
+            </button>
+          </div>
+        </div>
+        <button
+          v-if="pipelineForm.id && !pipeline.default"
+          class="mt-4 inline-flex items-center gap-2 rounded-md border border-n-ruby-7 px-3 py-2 text-sm text-n-ruby-10 hover:bg-n-ruby-3"
+          type="button"
+          @click="deletePipeline"
+        >
+          Excluir funil
+        </button>
       </form>
 
-      <form v-if="isStageOpen" class="crm-config-panel mt-4 grid gap-3 border border-n-weak bg-n-solid-1 p-4 md:grid-cols-[1fr_140px_140px_auto]" @submit.prevent="createStage">
-        <label>
-          <span class="mb-1 block text-sm font-medium text-n-slate-12">Nome da etapa</span>
-          <input v-model="stageForm.name" required class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" placeholder="Ex: Proposta aceita" />
-        </label>
-        <label>
-          <span class="mb-1 block text-sm font-medium text-n-slate-12">Parado apos</span>
-          <input v-model="stageForm.stale_after_days" type="number" min="0" required class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
-        </label>
-        <label>
-          <span class="mb-1 block text-sm font-medium text-n-slate-12">Chance %</span>
-          <input v-model="stageForm.win_probability" type="number" min="0" max="100" required class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
-        </label>
-        <div class="flex items-end gap-2">
-          <button class="rounded-md bg-n-blue-9 px-3 py-2 text-sm font-semibold text-white" type="submit">
-            <span class="i-lucide-plus size-4" />
-            Adicionar
-          </button>
-          <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12" type="button" @click="isStageOpen = false">
-            Cancelar
+      <section v-if="isStageOpen" class="crm-config-panel mt-4 border border-n-weak bg-n-solid-1 p-4">
+        <div class="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h2 class="text-sm font-semibold tracking-tight text-n-slate-12">Configuracao das etapas</h2>
+            <p class="mt-1 text-xs text-n-slate-11">
+              Defina manualmente os prazos e probabilidades sem poluir o board.
+            </p>
+          </div>
+          <button class="text-sm text-n-slate-11 hover:text-n-slate-12" type="button" @click="isStageOpen = false">
+            Fechar
           </button>
         </div>
-      </form>
 
-      <div class="crm-metrics mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <form class="grid gap-3 md:grid-cols-[1fr_140px_140px_auto]" @submit.prevent="createStage">
+          <label>
+            <span class="mb-1 block text-sm font-medium text-n-slate-12">Nome da etapa</span>
+            <input v-model="stageForm.name" required class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" placeholder="Ex: Proposta aceita" />
+          </label>
+          <label>
+            <span class="mb-1 block text-sm font-medium text-n-slate-12">Parado apos</span>
+            <input v-model="stageForm.stale_after_days" type="number" min="0" required class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
+          </label>
+          <label>
+            <span class="mb-1 block text-sm font-medium text-n-slate-12">Chance %</span>
+            <input v-model="stageForm.win_probability" type="number" min="0" max="100" required class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
+          </label>
+          <div class="flex items-end gap-2">
+            <button class="rounded-md bg-n-blue-9 px-3 py-2 text-sm font-semibold text-white" type="submit">
+              <span class="i-lucide-plus size-4" />
+              Adicionar
+            </button>
+          </div>
+        </form>
+
+        <div v-if="stages.length" class="mt-5 space-y-2">
+          <article
+            v-for="stage in stages"
+            :key="`stage-config-${stage.id}`"
+            class="crm-stage-config-row grid gap-3 border border-n-weak bg-n-alpha-1 p-3 md:grid-cols-[minmax(0,1fr)_140px_140px_auto]"
+          >
+            <label>
+              <span class="mb-1 block text-xs font-medium uppercase text-n-slate-10">Etapa</span>
+              <input v-model="stage.name" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" @change="updateStage(stage)" />
+            </label>
+            <label>
+              <span class="mb-1 block text-xs font-medium uppercase text-n-slate-10">Parado apos</span>
+              <div class="crm-stage-number">
+                <input v-model="stage.stale_after_days" type="number" min="0" @change="updateStage(stage)" />
+                <b>d</b>
+              </div>
+            </label>
+            <label>
+              <span class="mb-1 block text-xs font-medium uppercase text-n-slate-10">Chance</span>
+              <div class="crm-stage-number">
+                <input v-model="stage.win_probability" type="number" min="0" max="100" @change="updateStage(stage)" />
+                <b>%</b>
+              </div>
+            </label>
+            <div class="flex items-end">
+              <button class="rounded-md border border-n-ruby-7 px-3 py-2 text-sm text-n-ruby-10 hover:bg-n-ruby-3" type="button" @click="deleteStage(stage)">
+                Excluir
+              </button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <div v-if="isMetricsOpen" class="crm-metrics mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
         <div class="crm-metric-card border border-n-weak bg-n-solid-1 p-3">
           <span class="crm-metric-icon i-lucide-panels-top-left" />
           <span class="text-xs text-n-slate-10">Cards ativos</span>
@@ -743,26 +826,7 @@ onMounted(loadBoard);
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
                   <span class="rounded-md bg-n-alpha-2 px-2.5 py-1 text-xs font-semibold text-n-blue-11">{{ visibleCards(stage.id).length }}</span>
-                  <button class="crm-icon-button text-n-ruby-10" type="button" title="Excluir etapa" @click="deleteStage(stage)">
-                    <span class="i-lucide-trash-2 size-3.5" />
-                  </button>
                 </div>
-              </div>
-              <div class="crm-stage-settings mt-3 grid grid-cols-2 gap-3">
-                <label>
-                  <span>Parado apos</span>
-                  <div class="crm-stage-number">
-                    <input v-model="stage.stale_after_days" type="number" min="0" @change="updateStage(stage)" />
-                    <b>d</b>
-                  </div>
-                </label>
-                <label>
-                  <span>Chance</span>
-                  <div class="crm-stage-number">
-                    <input v-model="stage.win_probability" type="number" min="0" max="100" @change="updateStage(stage)" />
-                    <b>%</b>
-                  </div>
-                </label>
               </div>
             </div>
 
@@ -799,6 +863,13 @@ onMounted(loadBoard);
                     {{ formatMoney(card.budget_amount, card.budget_currency) }}
                   </span>
                   <span v-if="card.product" class="crm-card-chip">{{ card.product.name }}</span>
+                  <span
+                    v-if="card.product"
+                    class="crm-card-chip crm-product-availability"
+                    :class="productAvailabilityClass(card.product)"
+                  >
+                    {{ productAvailabilityLabel(card.product) }}
+                  </span>
                   <span v-if="card.auto_created" class="crm-card-chip">Auto</span>
                   <span v-if="card.status !== 'open'" class="crm-card-chip">{{ card.status }}</span>
                 </div>
@@ -1039,22 +1110,20 @@ onMounted(loadBoard);
 
 <style scoped>
 .crm-kanban-page {
-  --crm-panel-radius: 8px;
-  --crm-page-padding: clamp(0.875rem, 1.35vw, 1.25rem);
-  --crm-shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.05);
+  --crm-panel-radius: 12px;
+  --crm-page-padding: clamp(1rem, 1.6vw, 1.5rem);
+  --crm-shadow-soft: none;
   --crm-stage-accent: rgb(var(--blue-9));
-  --crm-field-bg: rgba(15, 118, 110, 0.065);
+  --crm-field-bg: rgba(var(--background-input-box));
   --crm-field-bg-focus: rgb(var(--surface-2));
-  --crm-field-border: rgba(var(--border-container));
-  --alpha-1: 15, 118, 110, 0.055;
-  --alpha-2: 15, 118, 110, 0.075;
+  --crm-field-border: rgb(var(--border-weak));
+  --alpha-1: 255, 255, 255, 0.045;
+  --alpha-2: 255, 255, 255, 0.065;
 }
 
 .crm-page-header {
   padding: var(--crm-page-padding);
-  background:
-    radial-gradient(circle at 12% 0%, rgba(var(--alpha-1)) 0, transparent 34%),
-    linear-gradient(180deg, rgb(var(--surface-2)) 0%, rgb(var(--background-color)) 100%);
+  background: rgb(var(--background-color));
 }
 
 .crm-title-row {
@@ -1062,7 +1131,10 @@ onMounted(loadBoard);
 }
 
 .crm-title-row h1 {
+  color: rgb(var(--slate-12));
   font-size: clamp(1.5rem, 1.8vw, 2rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
   line-height: 1.12;
 }
 
@@ -1081,9 +1153,11 @@ onMounted(loadBoard);
 }
 
 .crm-eyebrow {
-  background: rgb(var(--solid-blue-2));
-  color: rgb(var(--text-blue));
+  border: 1px solid rgb(var(--border-weak));
+  background: rgb(var(--surface-1));
+  color: rgb(var(--slate-10));
   padding: 0.25rem 0.625rem;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -1107,12 +1181,20 @@ onMounted(loadBoard);
 .crm-header-actions button {
   display: inline-flex;
   min-width: 0;
-  min-height: 2.25rem;
+  min-height: 2.5rem;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
   padding-inline: 0.75rem;
-  box-shadow: 0 1px 1px rgba(15, 23, 42, 0.03);
+  box-shadow: none;
+}
+
+.crm-header-actions button.bg-n-blue-9,
+.crm-config-panel button.bg-n-blue-9,
+.crm-detail-panel button.bg-n-blue-9 {
+  background: #ff5b25;
+  color: white;
+  box-shadow: none;
 }
 
 .crm-metrics {
@@ -1123,16 +1205,13 @@ onMounted(loadBoard);
   position: relative;
   min-height: 4.75rem;
   overflow: hidden;
-  padding: 0.85rem;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.035);
+  padding: 1rem;
+  background: rgb(var(--surface-2));
+  box-shadow: none;
 }
 
 .crm-metric-card::before {
-  position: absolute;
-  inset: 0 0 auto;
-  height: 3px;
-  background: linear-gradient(90deg, rgb(var(--blue-8)), rgb(var(--teal-7)));
-  content: '';
+  content: none;
 }
 
 .crm-metric-icon {
@@ -1155,7 +1234,7 @@ onMounted(loadBoard);
 }
 
 .crm-config-panel {
-  box-shadow: 0 1px 2px rgba(14, 33, 31, 0.04);
+  box-shadow: none;
 }
 
 .crm-config-panel textarea {
@@ -1164,9 +1243,7 @@ onMounted(loadBoard);
 }
 
 .crm-workspace {
-  background:
-    linear-gradient(rgba(var(--black-alpha-2)), rgba(var(--black-alpha-2))),
-    rgb(var(--background-color));
+  background: rgb(var(--background-color));
 }
 
 .crm-board-scroll {
@@ -1177,37 +1254,32 @@ onMounted(loadBoard);
 
 .crm-stage {
   position: relative;
-  width: clamp(18rem, 22vw, 20.5rem);
+  width: clamp(19rem, 23vw, 22rem);
   max-height: 100%;
   overflow: hidden;
-  border-color: rgba(var(--border-container));
-  background:
-    linear-gradient(180deg, rgba(var(--alpha-3)) 0%, rgb(var(--surface-1)) 100%);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  border-color: rgb(var(--border-weak));
+  background: rgb(var(--surface-2));
+  box-shadow: none;
 }
 
 .crm-stage > div:first-child {
-  padding: 0.875rem 1rem;
+  padding: 1rem;
 }
 
 .crm-stage > div:last-child {
-  padding: 0.875rem;
+  padding: 1rem;
 }
 
 .crm-stage::before {
-  position: absolute;
-  inset: 0 0 auto;
-  height: 3px;
-  background: var(--crm-stage-accent);
-  content: '';
+  content: none;
 }
 
 .crm-stage.accent-green {
-  --crm-stage-accent: rgb(var(--teal-9));
+  --crm-stage-accent: rgb(var(--blue-9));
 }
 
 .crm-stage.accent-blue {
-  --crm-stage-accent: rgb(var(--blue-9));
+  --crm-stage-accent: rgb(var(--ruby-9));
 }
 
 .crm-stage.accent-amber {
@@ -1233,26 +1305,12 @@ onMounted(loadBoard);
   flex: 0 0 auto;
   border-radius: 999px;
   background: var(--crm-stage-accent);
-  box-shadow: 0 0 0 3px rgba(var(--alpha-1));
+  box-shadow: 0 0 0 3px rgba(255, 91, 37, 0.1);
 }
 
 .crm-stage-title {
   min-height: 2rem;
   padding: 0.25rem 0.35rem;
-}
-
-.crm-stage-settings label {
-  min-width: 0;
-}
-
-.crm-stage-settings label > span {
-  display: block;
-  margin-bottom: 0.35rem;
-  color: rgb(var(--slate-10));
-  font-size: 0.6875rem;
-  font-weight: 700;
-  line-height: 1rem;
-  text-transform: uppercase;
 }
 
 .crm-stage-number {
@@ -1262,7 +1320,11 @@ onMounted(loadBoard);
   overflow: hidden;
   border: 1px solid var(--crm-field-border);
   border-radius: 0.5rem;
-  background: var(--crm-field-bg);
+  background: rgba(var(--background-input-box));
+}
+
+.crm-stage-config-row {
+  border-radius: var(--crm-panel-radius);
 }
 
 .crm-stage-number input {
@@ -1274,6 +1336,8 @@ onMounted(loadBoard);
   padding: 0.35rem 0.6rem;
   font-size: 0.9375rem;
   font-weight: 700;
+  color: rgb(var(--slate-12));
+  outline: none;
 }
 
 .crm-stage-number b {
@@ -1283,11 +1347,11 @@ onMounted(loadBoard);
 }
 
 .crm-icon-button {
-  width: 2rem;
-  height: 2rem;
-  border: 1px solid rgba(var(--border-container));
-  border-radius: 0.5rem;
-  background: rgba(var(--alpha-1));
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid rgb(var(--border-weak));
+  border-radius: 0.75rem;
+  background: rgb(var(--surface-1));
 }
 
 .crm-add-stage {
@@ -1296,10 +1360,10 @@ onMounted(loadBoard);
 }
 
 .crm-deal-card {
-  border-color: rgba(var(--border-container));
+  border-color: rgb(var(--border-weak));
   background: rgb(var(--surface-2));
-  padding: 0.875rem;
-  box-shadow: 0 1px 1px rgba(15, 23, 42, 0.03);
+  padding: 1rem;
+  box-shadow: none;
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease,
@@ -1312,7 +1376,7 @@ onMounted(loadBoard);
   border-color: rgb(var(--border-blue-strong));
   background: rgb(var(--solid-2));
   box-shadow: var(--crm-shadow-soft);
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .crm-deal-card.is-moving {
@@ -1321,10 +1385,9 @@ onMounted(loadBoard);
 }
 
 .crm-detail-panel {
-  padding: 1rem;
-  background:
-    linear-gradient(180deg, rgb(var(--surface-2)) 0%, rgb(var(--surface-1)) 100%);
-  box-shadow: -1px 0 0 rgba(var(--border-container));
+  padding: 1.5rem;
+  background: rgb(var(--surface-2));
+  box-shadow: -1px 0 0 rgb(var(--border-weak));
   scrollbar-color: rgba(var(--border-container)) transparent;
   scrollbar-width: thin;
 }
@@ -1336,9 +1399,57 @@ onMounted(loadBoard);
   gap: 0.25rem;
   border: 1px solid rgba(var(--label-border));
   border-radius: 999px;
-  background: rgb(var(--label-background));
+  background: rgba(var(--alpha-1));
   padding: 0.25rem 0.5rem;
   color: rgb(var(--slate-11));
+}
+
+.crm-detail-panel input,
+.crm-detail-panel textarea,
+.crm-detail-panel select,
+.crm-config-panel input,
+.crm-config-panel textarea {
+  border-radius: 10px;
+  background: rgba(var(--background-input-box));
+}
+
+.crm-detail-panel input:focus,
+.crm-detail-panel textarea:focus,
+.crm-detail-panel select:focus,
+.crm-config-panel input:focus,
+.crm-config-panel textarea:focus {
+  border-color: rgb(var(--border-blue-strong));
+  background: rgb(var(--solid-2));
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 91, 37, 0.14);
+}
+
+.crm-product-availability.is-success {
+  border-color: rgb(var(--teal-7));
+  background: rgb(var(--teal-3));
+  color: rgb(var(--teal-11));
+}
+
+.crm-product-availability.is-warning {
+  border-color: rgb(var(--amber-7));
+  background: rgb(var(--amber-3));
+  color: rgb(var(--amber-11));
+}
+
+.crm-product-availability.is-danger {
+  border-color: rgb(var(--ruby-7));
+  background: rgb(var(--ruby-3));
+  color: rgb(var(--ruby-10));
+}
+
+.crm-product-availability.is-info {
+  border-color: rgb(var(--blue-7));
+  background: rgb(var(--blue-3));
+  color: rgb(var(--blue-11));
+}
+
+.crm-product-availability.is-muted {
+  opacity: 0.75;
 }
 
 .crm-contact-avatar {
@@ -1350,10 +1461,10 @@ onMounted(loadBoard);
   justify-content: center;
   border: 1px solid rgba(var(--label-border));
   border-radius: 999px;
-  background: linear-gradient(135deg, rgb(var(--solid-blue-2)), rgb(var(--surface-2)));
-  color: rgb(var(--text-blue));
+  background: rgba(255, 91, 37, 0.12);
+  color: rgb(var(--blue-11));
   font-size: 0.75rem;
-  font-weight: 800;
+  font-weight: 700;
   text-transform: uppercase;
 }
 
@@ -1380,7 +1491,7 @@ onMounted(loadBoard);
 .crm-config-panel input,
 .crm-config-panel select,
 .crm-config-panel textarea {
-  min-height: 2.25rem;
+  min-height: 2.5rem;
   border-color: var(--crm-field-border);
   background: var(--crm-field-bg);
   color: rgb(var(--slate-12));
@@ -1401,11 +1512,19 @@ onMounted(loadBoard);
 .crm-config-panel textarea:focus {
   border-color: rgb(var(--border-blue-strong));
   background: var(--crm-field-bg-focus);
-  box-shadow: 0 0 0 3px rgba(var(--border-blue));
+  box-shadow: 0 0 0 3px rgba(255, 91, 37, 0.14);
 }
 
 .crm-stage .crm-stage-number input,
 .crm-stage .crm-stage-number input:focus {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.crm-stage .crm-stage-title,
+.crm-stage .crm-stage-title:focus {
+  min-height: 2rem;
   border: 0;
   background: transparent;
   box-shadow: none;
@@ -1437,39 +1556,39 @@ button:disabled {
 }
 
 :global(.dark) .crm-kanban-page {
-  --background-color: 18 20 22;
-  --surface-1: 24 26 28;
-  --surface-2: 30 32 34;
-  --solid-1: 28 30 32;
-  --solid-2: 34 36 38;
-  --solid-3: 39 42 44;
-  --card-color: 32 34 36;
-  --border-container: 255, 255, 255, 0.085;
-  --border-weak: 56 61 64;
+  --background-color: 17 19 23;
+  --surface-1: 13 14 18;
+  --surface-2: 24 27 32;
+  --solid-1: 24 27 32;
+  --solid-2: 28 31 37;
+  --solid-3: 32 36 43;
+  --card-color: 24 27 32;
+  --border-container: 255, 255, 255, 0.08;
+  --border-weak: 40 44 51;
   --alpha-1: 255, 255, 255, 0.045;
   --alpha-2: 255, 255, 255, 0.06;
   --alpha-3: 30, 32, 34, 0.96;
-  --crm-field-bg: rgba(255, 255, 255, 0.055);
-  --crm-field-bg-focus: rgba(255, 255, 255, 0.08);
-  --crm-field-border: rgba(255, 255, 255, 0.1);
-  --label-background: 255 255 255;
+  --crm-field-bg: rgba(12, 14, 17, 0.72);
+  --crm-field-bg-focus: rgb(28 31 37);
+  --crm-field-border: rgb(40 44 51);
+  --label-background: 32 36 43;
   --label-border: 255, 255, 255, 0.075;
 }
 
 :global(.dark) .crm-workspace {
-  background: rgb(15 17 18);
+  background: hsl(220deg 15% 8%);
 }
 
 :global(.dark) .crm-stage {
-  background: linear-gradient(180deg, rgb(29 31 33) 0%, rgb(24 26 28) 100%);
+  background: hsl(220deg 15% 11%);
 }
 
 :global(.dark) .crm-deal-card {
-  background: rgb(32 34 36);
+  background: hsl(220deg 15% 11%);
 }
 
 :global(.dark) .crm-deal-card:hover {
-  background: rgb(37 40 42);
+  background: rgb(28 31 37);
 }
 
 :global(.dark) .crm-card-chip {
@@ -1477,7 +1596,7 @@ button:disabled {
 }
 
 :global(.dark) .crm-contact-avatar {
-  background: linear-gradient(135deg, rgba(94, 234, 212, 0.16), rgba(255, 255, 255, 0.055));
+  background: rgba(255, 91, 37, 0.12);
 }
 
 @media (max-width: 1279px) {
