@@ -234,7 +234,8 @@ Estado atual deste chat:
   - `_next-colors.scss` recebeu ajuste pequeno no dark mode para fundo mais profundo e superficies mais legiveis;
   - `Sidebar.vue` recebeu ajuste visual leve na busca, botao de nova conversa e altura minima dos itens, sem alterar rotas ou comportamento;
   - escopo visual apenas; sem controller, model, migration, job, service, payload, Quepasa ou contrato alterado;
-  - validacao: `git diff --check` passou e `docker image build -f docker/Dockerfile -t unicocrm-style-check .` passou. Nao houve deploy, commit ou push.
+  - validacao inicial: `git diff --check` passou e `docker image build -f docker/Dockerfile -t unicocrm-style-check .` passou;
+  - publicacao/deploy apos pedido explicito do Thiago: commit `657d5f1 style(crm): add SaaS visual foundation` foi enviado para `origin/main`; `docker image build -f docker/Dockerfile -t delvechiotech/unicocrm:latest .` passou; `docker image push delvechiotech/unicocrm:latest` publicou `sha256:c756030a16aa98be58d6aba73414e78af2bc553f76cabae0bca3f960be6a4704`; Portainer redeployou a stack; `app` e `sidekiq` ficaram `completed`; health publico HTTP `200`. Houve `502` temporario durante boot e falhas TLS intermitentes no PowerShell contra Portainer, mas validacao via Node confirmou status.
 - Deve evitar mudar regra de negocio, migrations, jobs ou providers.
 
 Arquivos sensiveis:

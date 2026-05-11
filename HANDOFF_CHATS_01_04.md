@@ -412,7 +412,8 @@ Estado atual conhecido:
   - `_woot.scss` ganhou uma camada visual comum restrita a paginas/classes `crm-*`, padronizando tipografia, cards, inputs, botoes, chips, foco e superficies;
   - `_next-colors.scss` teve ajuste leve no dark mode para fundo mais profundo e melhor separacao das superficies;
   - `Sidebar.vue` foi refinado visualmente na busca, botao de composicao e altura dos itens, sem mudar rotas, permissoes ou comportamento;
-  - validacao: `git diff --check` passou; build Docker de verificacao `unicocrm-style-check` passou; nao houve deploy, commit ou push.
+  - validacao inicial: `git diff --check` passou; build Docker de verificacao `unicocrm-style-check` passou;
+  - publicacao/deploy apos pedido explicito do Thiago: commit `657d5f1 style(crm): add SaaS visual foundation` foi enviado para `origin/main`; build Docker de `delvechiotech/unicocrm:latest` passou; push Docker publicou `sha256:c756030a16aa98be58d6aba73414e78af2bc553f76cabae0bca3f960be6a4704`; Portainer concluiu update de `app` e `sidekiq`; health publico respondeu HTTP `200`.
 - Apos a instrucao permanente de fazer build/push/deploy ao terminar etapa, o build Docker local passou; depois de confirmacao explicita do Thiago, o push Docker tambem passou e o redeploy Portainer foi executado. `chatwoot_chatwoot_app` e `chatwoot_chatwoot_sidekiq` retornaram update `completed` no digest `sha256:3e79f75b2518301222e297311d50da3655ea7976fa90c3cb72edf10f76e5f4c2`; health check publico local ficou inconclusivo por falhas de conexao HTTPS/intermitencia.
 - Build/push/deploy da frente Style/UI publicou `delvechiotech/unicocrm:latest@sha256:92af187b6874228fd4d3e17c585dd28dbc6da1a91b9e5e23775120c39dcd0d7f`.
 - Portainer stack `chatwoot` atualizou `app` e `sidekiq`; health check final em `https://chat.unicocrm.com/` respondeu HTTP `200 OK`.

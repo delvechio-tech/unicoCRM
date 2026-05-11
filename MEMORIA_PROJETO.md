@@ -270,7 +270,8 @@ Revisao visual aplicada em 2026-05-09:
   - dark mode global foi levemente ajustado em `_next-colors.scss` para fundo mais profundo e maior separacao entre fundo e superficies;
   - sidebar recebeu busca/botao de nova conversa com altura mais consistente e itens com minimo de altura, mantendo menu e comportamento existentes;
   - escopo ficou visual; nao houve alteracao de regra de negocio, controllers, models, migrations, jobs, services, Quepasa, payloads ou contratos;
-  - validacao: `git diff --check` passou nos arquivos visuais e `docker image build -f docker/Dockerfile -t unicocrm-style-check .` passou. Nao houve deploy, commit ou push.
+  - validacao inicial: `git diff --check` passou nos arquivos visuais e `docker image build -f docker/Dockerfile -t unicocrm-style-check .` passou;
+  - publicacao em 2026-05-11 apos pedido explicito do Thiago: commit `657d5f1 style(crm): add SaaS visual foundation` enviado para `origin/main`; build Docker de `delvechiotech/unicocrm:latest` passou; push Docker publicou digest `sha256:c756030a16aa98be58d6aba73414e78af2bc553f76cabae0bca3f960be6a4704`; Portainer aceitou redeploy; `chatwoot_chatwoot_app` e `chatwoot_chatwoot_sidekiq` ficaram `completed` nesse digest; `https://chat.unicocrm.com/` e `/health` responderam HTTP `200`. Houve `502` temporario durante boot e falhas TLS intermitentes no PowerShell contra a API Portainer, contornadas com validacao via Node.
 - Rodada Kanban visual em 2026-05-09:
   - `git diff --check` passou;
   - `docker build -f docker/Dockerfile -t delvechiotech/unicocrm:latest .` passou e gerou manifest list local `sha256:e38da08d1b0e3f84451b69cd88a865f69658d17f9f33608b37a16c9a63b20695`;
