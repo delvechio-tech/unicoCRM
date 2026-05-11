@@ -332,6 +332,13 @@ const menuItems = computed(() => {
     ...(hasCrmAiAgents.value
       ? [
           {
+            name: 'CRM Inventory',
+            icon: 'i-lucide-package-check',
+            label: 'Estoque',
+            activeOn: ['crm_inventory_index'],
+            to: accountScopedRoute('crm_inventory_index'),
+          },
+          {
             name: 'CRM Kanban',
             icon: 'i-lucide-panels-top-left',
             label: 'Kanban',
@@ -813,7 +820,7 @@ const menuItems = computed(() => {
         <RouterLink
           v-if="!isEffectivelyCollapsed"
           :to="{ name: 'search' }"
-          class="flex gap-2 items-center px-2 py-1 w-full h-7 rounded-lg outline outline-1 outline-n-weak bg-n-button-color transition-all duration-100 ease-out"
+          class="flex gap-2 items-center px-3 py-1 w-full h-9 rounded-xl outline outline-1 outline-n-weak bg-n-button-color transition-all duration-100 ease-out"
         >
           <span class="flex-shrink-0 i-lucide-search size-4 text-n-slate-10" />
           <span class="flex-grow text-start text-n-slate-10">
@@ -843,7 +850,7 @@ const menuItems = computed(() => {
               :class="[
                 isEffectivelyCollapsed
                   ? '!size-8 !outline-n-weak !text-n-slate-11'
-                  : '!h-7 !outline-n-weak !text-n-slate-11',
+                  : '!h-9 !outline-n-weak !text-n-slate-11',
                 { '!bg-n-alpha-2 dark:!bg-n-slate-9/30': isOpen },
               ]"
               @click="onComposeOpen(toggle)"
@@ -914,28 +921,54 @@ const menuItems = computed(() => {
 
 <style scoped>
 .crm-app-sidebar {
-  background:
-    linear-gradient(180deg, rgb(var(--surface-2)) 0%, rgb(var(--surface-1)) 100%);
-  box-shadow: 1px 0 0 rgba(var(--border-container));
+  background: hsl(220deg 15% 6%);
+  box-shadow: 1px 0 0 rgb(var(--border-weak));
+}
+
+.crm-app-sidebar :deep(*) {
+  letter-spacing: 0;
 }
 
 .crm-app-sidebar :deep(a),
 .crm-app-sidebar :deep(button) {
-  border-radius: 8px;
+  border-radius: 0.75rem;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease;
+}
+
+.crm-app-sidebar :deep(a:hover),
+.crm-app-sidebar :deep(button:hover) {
+  background: rgba(255, 255, 255, 0.045);
 }
 
 .crm-app-sidebar :deep(nav) {
-  padding-top: 0.25rem;
+  padding-top: 0.5rem;
 }
 
 .crm-app-sidebar :deep(nav a),
 .crm-app-sidebar :deep(nav button) {
-  margin-bottom: 0.125rem;
+  margin-bottom: 0.25rem;
+  min-height: 2.25rem;
 }
 
 .crm-app-sidebar :deep(.router-link-active),
 .crm-app-sidebar :deep([aria-current='page']) {
-  color: rgb(var(--blue-11));
+  color: rgb(var(--slate-12));
+  background: rgba(255, 91, 37, 0.12);
+}
+
+.crm-app-sidebar :deep(.router-link-active svg),
+.crm-app-sidebar :deep([aria-current='page'] svg),
+.crm-app-sidebar :deep(.router-link-active [class*='i-lucide']),
+.crm-app-sidebar :deep([aria-current='page'] [class*='i-lucide']) {
+  color: #ff5b25;
+}
+
+.crm-app-sidebar :deep(svg),
+.crm-app-sidebar :deep([class*='i-lucide']) {
+  stroke-width: 1.8;
 }
 
 @media (max-width: 767px) {

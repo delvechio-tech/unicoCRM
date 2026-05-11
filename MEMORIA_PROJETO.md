@@ -10,6 +10,22 @@ Este arquivo registra o contexto tecnico e as decisoes principais do projeto par
 - Imagem anterior: `delvechiotech/chatwoot-quepasa:latest`.
 - O objetivo e transformar o Chatwoot em um CRM completo, mantendo o inbox/mensageria como base operacional.
 
+## Padrao operacional GSD / GitNexus / Patagon
+
+O projeto passa a usar tres camadas obrigatorias para evoluir com seguranca:
+
+- GSD: organiza frentes, escopo, handoffs, proximos passos e execucao.
+- GitNexus: analisa codigo, dependencias, rotas, tools, impacto e fluxos antes de mudancas sensiveis.
+- Patagon: faz benchmarking e critica arquitetural antes de qualquer feature nova ou refatoracao relevante.
+
+Arquivo de referencia: `PATAGON.md`.
+
+Regra permanente:
+
+- Antes de criar feature, refatorar modulo, alterar API/payload/tool/webhook/modelagem ou mexer em fluxo CRM, registrar um bloco Patagon com benchmark de mercado, comparacao com Chatwoot original, arquitetura proposta, performance/escala, riscos e decisao.
+- Patagon deve comparar referencias como Salesforce, HubSpot, Pipedrive, Intercom/Zendesk, Twenty, Whaticket ou Planka quando fizer sentido, mas sempre adaptar ao contexto do UnicoCRM.
+- Nao copiar produto externo por aparencia. Aproveitar apenas ideias que melhorem o UnicoCRM sem aumentar risco, custo ou acoplamento desnecessario.
+
 ## Quepasa nativo
 
 Ja foi criado um conector nativo WhatsApp API/Quepasa no Chatwoot.
@@ -155,14 +171,19 @@ Stack de producao atual deve usar:
 - `delvechiotech/unicocrm:latest` em `chatwoot_app`.
 - `delvechiotech/unicocrm:latest` em `chatwoot_sidekiq`.
 
-Deploy mais recente registrado:
+Deploy atual em producao:
 
-- Em 2026-05-09, apos revisao visual/responsiva de Style/UI nas telas CRM, foi feito build/push/deploy de `delvechiotech/unicocrm:latest`.
-- Digest publicado e observado nas tasks: `sha256:92af187b6874228fd4d3e17c585dd28dbc6da1a91b9e5e23775120c39dcd0d7f`.
+- Imagem: `delvechiotech/unicocrm:latest`.
+- Digest mais recente observado em producao: `sha256:fdd660a0e47a8a131ac8fff7531fb88d2f6a6b70c71aed347f7da464c9b579b4`.
+- Frente do deploy: `05 - Estoque`.
 - Portainer stack `chatwoot` foi atualizada com `PullImage=true`.
-- `https://chat.unicocrm.com/` respondeu HTTP `200 OK`.
-- Houve um `502` temporario logo apos o redeploy enquanto o Rails/Puma ainda inicializava; logs depois mostraram Puma ouvindo em `0.0.0.0:3000` e o health check final passou.
-- Importante: este deploy incluiu o estado completo do workspace local no momento do build, incluindo alteracoes funcionais preexistentes ainda nao commitadas.
+- `chatwoot_chatwoot_app` e `chatwoot_chatwoot_sidekiq` ficaram com update `completed`.
+- Health check via Node/OpenSSL respondeu `https://chat.unicocrm.com` HTTP `200 OK` e `/health` HTTP `200 OK` com `{"status":"woot"}`.
+- Importante: este deploy incluiu o estado completo do workspace local no momento do build, incluindo alteracoes funcionais preexistentes ainda nao commitadas. Nao assumir que GitHub e producao estao iguais ate organizar commits.
+
+Historico de deploys anteriores:
+
+- Os digests antigos registrados nas secoes das frentes anteriores sao historico operacional por etapa. Eles nao devem ser tratados como o deploy atual se conflitarem com a secao `Deploy atual em producao`.
 
 Depois de trocar a imagem, executar repull/update da stack para aplicar migrations e compilar o frontend novo.
 Nao montar volume externo em `/app/public`, pois isso pode servir assets antigos e esconder telas novas como WhatsApp API/Quepasa e Agentes de IA.
@@ -210,6 +231,46 @@ Revisao visual aplicada em 2026-05-09:
   - Portainer stack `chatwoot` foi atualizada com `PullImage=true`;
   - `chatwoot_chatwoot_app` e `chatwoot_chatwoot_sidekiq` retornaram update `completed` apontando para o novo digest;
   - health check publico via ambiente local ficou inconclusivo/intermitente apos o deploy, com falhas de conexao HTTPS nas tentativas feitas.
+- Revisao ampla de identidade visual CRM inspirada no `docs_referencia/Exemplo leyout`:
+  - referencia analisada: portal Lovable/shadcn com Inter, dark SaaS, sidebar escura, cards com borda/radius, inputs padronizados e acento laranja;
+  - acento principal do UnicoCRM foi migrado de teal para laranja (`#FF5B25`) em `theme/colors.js` e nos tokens `n-blue`, mantendo teal/verde para estados de sucesso/estoque;
+  - superficies dark foram reorganizadas para fundo quase preto/azulado, cards mais claros, bordas finas e menos dependencia de sombras;
+  - sidebar recebeu visual mais SaaS: item ativo com bloco arredondado, laranja como cor ativa, mais respiro entre itens e radius 12px;
+  - telas CRM afetadas visualmente: Agentes/Produtos, Kanban e Estoque;
+  - Kanban manteve produtividade/densidade de CRM, mas recebeu header, metricas, stages, cards, chips e painel lateral mais consistentes com o novo design;
+  - Agentes/Produtos e Estoque receberam padrao visual mais proximo de shadcn: cards `p-6`, labels uppercase, inputs uniformes, botoes primarios em gradiente laranja e surfaces consistentes;
+  - nenhuma alteracao intencional foi feita em regras de negocio, controllers, models, jobs, migrations, payloads ou contratos de API nesta etapa de identidade visual.
+  - validacao/deploy da etapa visual: `git diff --check` passou; `docker image build -f docker/Dockerfile -t delvechiotech/unicocrm:latest .` passou; `docker image push delvechiotech/unicocrm:latest` publicou digest `sha256:e694c939d954c321219816900c7a766bbfc0839e30558ea1ec5504fe052d7105`; Portainer atualizou `app` e `sidekiq` com update `completed`; `https://chat.unicocrm.com/` e `/health` responderam HTTP `200`.
+- Refatoracao visual posterior em 2026-05-10 para aproximar de Linear/Shadcn minimalista:
+  - manteve o accent laranja `#FF5B25`, mas removeu gradientes, radiais e sombras marcadas das telas CRM;
+  - dark mode foi ajustado para fundo principal proximo de `hsl(220 15% 8%)`, superficies em `hsl(220 15% 11%)` e bordas finas discretas;
+  - sidebar ficou mais escura (`hsl(220 15% 6%)`), com hover sutil e item ativo em bloco discreto com icone laranja;
+  - botoes primarios ficaram solidos, altura 40px e radius 12px; inputs ganharam foco com ring laranja sutil;
+  - telas de configuracao de Agentes/Produtos e Estoque passaram a limitar largura de conteudo para melhorar leitura em monitores largos;
+  - Kanban preservou largura operacional, mas ficou mais limpo: sem barras/gradientes de destaque, cards/colunas com borda e superficie silenciosa;
+  - alteracoes intencionais ficaram restritas a CSS/SCSS/tokens/classes de layout; nao foram alterados controllers, models, migrations, jobs, services ou contratos de API nesta rodada.
+  - validacao/deploy: `git diff --check` passou; `docker image build -f docker/Dockerfile -t delvechiotech/unicocrm:latest .` passou; `docker image push delvechiotech/unicocrm:latest` publicou digest `sha256:68f3f1f2e34f6cf7691084c981f3c47c1becdfe2cd10ab35255be58854d4456a`; Portainer concluiu update de `chatwoot_chatwoot_app` e `chatwoot_chatwoot_sidekiq`; `https://chat.unicocrm.com/` e `/health` responderam HTTP `200`.
+- Ajuste visual do Kanban em 2026-05-10:
+  - campos manuais de etapa (`Parado apos` e `Chance`) foram removidos do topo das colunas e concentrados no painel `Etapas`;
+  - exclusao de etapa saiu do icone de lixeira visivel em cada coluna e passou a ficar no painel `Etapas`;
+  - exclusao de funil saiu da barra principal e ficou dentro de `Configurar funil`;
+  - objetivo: manter parametros manuais, mas esconder configuracoes administrativas para deixar o board mais limpo;
+  - nao houve alteracao intencional de controller, model, migration, job, service, API ou contrato de dados;
+  - validacao/deploy: `git diff --check -- app/javascript/dashboard/routes/dashboard/crm/kanban/Index.vue` passou; build Docker passou; push publicou digest `sha256:d16499366903b5411b5e321cb77f657c04b4ffb0d7887986aaaf9d8fca079dc8`; Portainer concluiu update de `app` e `sidekiq`; health publico HTTP `200`.
+- Ajuste de metricas do Kanban em 2026-05-10:
+  - metricas do topo passaram a ficar escondidas por padrao atras do botao `Metricas`, com resumo de cards ativos no proprio botao;
+  - o titulo editavel da etapa deixou de herdar fundo de input, removendo o retangulo preto atras do texto da coluna;
+  - alteracao limitada a UI/estilo no `Index.vue` do Kanban, sem mudar API, models, services, jobs ou contratos;
+  - validacao/deploy: `git diff --check -- app/javascript/dashboard/routes/dashboard/crm/kanban/Index.vue` passou; build Docker passou; push publicou digest `sha256:8b3f17fd27ae5a4dd9f9dc1f3922d966af2a5412973ac0efcd4f1cec9f14cc6c`; Portainer aceitou o redeploy; health publico de `https://chat.unicocrm.com/` e `/health` respondeu HTTP `200`. A leitura final de status via API do Portainer falhou por erro TLS intermitente.
+- Primeira rodada da identidade visual SaaS em 2026-05-11:
+  - Patagon aplicado: referencias conceituais Linear, Twenty, HubSpot e Intercom foram usadas apenas para escala, consistencia e disciplina visual, sem copiar arquitetura ou fluxo externo;
+  - diagnostico: as features novas (`Agentes de IA`, `Estoque`, `Kanban`) tinham estilos locais diferentes para tipografia, cards, inputs, radius, metricas e botoes, causando aparencia irregular;
+  - design system alvo definido: Inter como fonte, page titles em 24-30px/semibold, section titles em 16-20px, body em 14px, labels pequenas uppercase/muted, cards com borda e radius 12px, inputs 40px com foco laranja, botoes 40px e dark mode com superficies discretas;
+  - implementacao inicial criou uma fundacao CSS restrita a paginas/classes `crm-*` em `_woot.scss`, padronizando tipografia, superficies, cards, inputs, botoes, chips e foco;
+  - dark mode global foi levemente ajustado em `_next-colors.scss` para fundo mais profundo e maior separacao entre fundo e superficies;
+  - sidebar recebeu busca/botao de nova conversa com altura mais consistente e itens com minimo de altura, mantendo menu e comportamento existentes;
+  - escopo ficou visual; nao houve alteracao de regra de negocio, controllers, models, migrations, jobs, services, Quepasa, payloads ou contratos;
+  - validacao: `git diff --check` passou nos arquivos visuais e `docker image build -f docker/Dockerfile -t unicocrm-style-check .` passou. Nao houve deploy, commit ou push.
 - Rodada Kanban visual em 2026-05-09:
   - `git diff --check` passou;
   - `docker build -f docker/Dockerfile -t delvechiotech/unicocrm:latest .` passou e gerou manifest list local `sha256:e38da08d1b0e3f84451b69cd88a865f69658d17f9f33608b37a16c9a63b20695`;
@@ -285,13 +346,62 @@ Em 2026-05-09, o projeto passou a usar handoff explicito entre quatro frentes/ch
 
 Frente atual deste chat:
 
-- `04 - Kanban CRM`
+- `05 - Estoque`
 
-Responsabilidade da frente 04:
+Responsabilidade da frente 05:
 
-- Evoluir Kanban, pipelines, etapas, cards, atividades, linha do tempo, webhooks e sync automatico.
-- Melhorar a experiencia visual do Kanban sem trocar a modelagem propria de CRM por labels/conversas.
-- Registrar impacto para Chat 01 se tocar mensageria/Quepasa e para Chat 02 se tocar tools/payloads de IA.
+- Planejar e implementar a feature de Estoque/Produtos Comerciais conectada ao CRM.
+- Evoluir a base `crm_products` respeitando o uso atual por Agentes de IA e Kanban.
+- Registrar impacto para Chat 02 se alterar tools/payloads de IA, para Chat 03 se tocar tela/estilo compartilhado e para Chat 04 se alterar integracao com oportunidades/propostas Kanban.
+
+## Estoque / Produtos Comerciais
+
+Frente iniciada em 2026-05-09 como `05 - Estoque`.
+
+Estado inicial revisado:
+
+- `crm_products` ja existe como entidade de CRM escopada por conta.
+- Campos atuais: nome, SKU, categoria, moeda, preco, ativo, descricao, FAQ, objecoes, notas de midia e `metadata` JSONB.
+- Produtos ja suportam anexos via ActiveStorage (`media_files`).
+- SKU ja e unico por conta quando preenchido.
+- Produtos ja sao vinculados a Agentes de IA por `crm_ai_agent_products`.
+- Produtos ja sao vinculaveis a cards do Kanban por `crm_kanban_cards.product_id`.
+- Tools de IA ja retornam produtos ativos vinculados ao agente, com dados de preco, midia e `metadata`.
+
+Decisao tecnica recomendada antes de implementar:
+
+- Estoque deve ser uma evolucao de `crm_products` com campos comerciais basicos de disponibilidade e uma tabela relacionada para movimentos/reservas quando houver controle transacional.
+- Evitar criar uma entidade separada e duplicada de produto, porque isso quebraria o contrato atual de IA/Kanban e criaria duas fontes de verdade.
+- A primeira implementacao deve adicionar disponibilidade, quantidade e status operacional sem alterar Quepasa/WhatsApp nem provider de mensagens.
+
+Status desta etapa:
+
+- Implementacao inicial aprovada e aplicada em 2026-05-09.
+- `crm_products` foi evoluido de forma aditiva com campos de estoque:
+  - `availability_status`;
+  - `stock_quantity`;
+  - `reserved_quantity`;
+  - `low_stock_threshold`;
+  - `track_inventory`.
+- `Crm::Product` passou a expor `available_quantity`, `low_stock?` e `sale_available?`.
+- A API de produtos passou a aceitar/retornar os novos campos e indicadores derivados.
+- Foi criada a rota frontend `/app/accounts/:accountId/crm/inventory` com acesso direto na sidebar como `Estoque`.
+- A tela de Estoque usa lista lateral rapida, busca por nome/SKU/categoria, metricas de estoque e editor de item com preco, status, disponibilidade, quantidade, reservado, alerta, descricao e midias.
+- A aba Produtos dentro de Agentes de IA tambem foi atualizada para preservar e editar os campos de estoque.
+- Tools de IA de produtos/FAQs e payload n8n passaram a explicitar disponibilidade, quantidade, reservas e politica para nao inventar estoque.
+- Kanban passou a receber dados de disponibilidade no payload do produto e exibir chip de disponibilidade nos cards.
+- Nao houve alteracao em Quepasa/WhatsApp, provider de mensagens, webhook de mensageria ou deploy.
+- Validacoes executadas:
+  - `git diff --check` passou;
+  - `node --check` passou em arquivos JS alterados aplicaveis;
+  - `docker image build -f docker/Dockerfile -t unicocrm-inventory-check .` passou, com assets precompilados e sem push/deploy.
+- Deploy da frente Estoque em 2026-05-09:
+  - `docker image build -f docker/Dockerfile -t delvechiotech/unicocrm:latest .` passou;
+  - `docker image push delvechiotech/unicocrm:latest` passou e publicou `sha256:fdd660a0e47a8a131ac8fff7531fb88d2f6a6b70c71aed347f7da464c9b579b4`;
+  - Portainer stack `chatwoot` foi atualizada com `PullImage=true`;
+  - `chatwoot_chatwoot_app` e `chatwoot_chatwoot_sidekiq` ficaram com update `completed` apontando para `delvechiotech/unicocrm:latest@sha256:fdd660a0e47a8a131ac8fff7531fb88d2f6a6b70c71aed347f7da464c9b579b4`;
+  - health check via Node/OpenSSL respondeu `https://chat.unicocrm.com` HTTP `200 OK` e `/health` HTTP `200 OK` com `{"status":"woot"}`;
+  - PowerShell/curl local tiveram falhas de TLS/conexao durante a validacao HTTPS, mas Node confirmou o health publico.
 
 Documentos de handoff:
 

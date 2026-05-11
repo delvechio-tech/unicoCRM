@@ -38,6 +38,209 @@ body {
   color: rgb(var(--slate-12));
 }
 
+body,
+input,
+textarea,
+select,
+button {
+  letter-spacing: 0;
+}
+
+.crm-ai-page,
+.crm-inventory-page,
+.crm-kanban-page {
+  --crm-accent: #ff5b25;
+  --crm-accent-hover: #ff6a3a;
+  --crm-radius-xs: 0.5rem;
+  --crm-radius-sm: 0.625rem;
+  --crm-radius-md: 0.75rem;
+  --crm-radius-lg: 0.875rem;
+  --crm-space-page: clamp(1rem, 1.6vw, 1.5rem);
+  --crm-space-card: 1.5rem;
+  --crm-surface-card: rgb(var(--surface-2));
+  --crm-surface-muted: rgb(var(--surface-1));
+  --crm-border: rgb(var(--border-weak));
+  --crm-field-bg: rgba(var(--background-input-box));
+  --crm-ring: 0 0 0 3px rgba(255, 91, 37, 0.14);
+  --crm-shadow: none;
+
+  font-family:
+    'Inter',
+    -apple-system,
+    system-ui,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  color: rgb(var(--slate-12));
+}
+
+.crm-ai-page h1,
+.crm-inventory-page h1,
+.crm-kanban-page h1 {
+  font-size: clamp(1.5rem, 1.65vw, 1.875rem);
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.15;
+}
+
+.crm-ai-page h2,
+.crm-inventory-page h2,
+.crm-kanban-page h2 {
+  font-size: clamp(1.125rem, 1.2vw, 1.25rem);
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.25;
+}
+
+.crm-ai-page h3,
+.crm-inventory-page h3,
+.crm-kanban-page h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+
+.crm-ai-page p,
+.crm-inventory-page p,
+.crm-kanban-page p {
+  letter-spacing: 0;
+}
+
+.crm-form-card,
+.crm-side-card,
+.crm-resource-card,
+.crm-metric-card,
+.crm-inventory-item,
+.crm-stage,
+.crm-deal-card,
+.crm-config-panel,
+.crm-detail-panel,
+.crm-playground-card {
+  border-color: var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-surface-card);
+  box-shadow: var(--crm-shadow);
+}
+
+.crm-form-card,
+.crm-side-card {
+  padding: var(--crm-space-card);
+}
+
+.crm-metric-card {
+  min-height: 5rem;
+}
+
+.crm-field-label,
+.crm-ai-page label > span:not([class*='i-lucide']),
+.crm-inventory-page label > span:not([class*='i-lucide']),
+.crm-kanban-page label > span:not([class*='i-lucide']) {
+  color: rgb(var(--slate-10));
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1rem;
+  text-transform: uppercase;
+}
+
+.crm-field-control,
+.crm-control,
+.crm-ai-page input,
+.crm-ai-page textarea,
+.crm-ai-page select,
+.crm-inventory-page input,
+.crm-inventory-page textarea,
+.crm-inventory-page select,
+.crm-kanban-page input,
+.crm-kanban-page textarea,
+.crm-kanban-page select {
+  border-color: var(--crm-border);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-field-bg);
+  color: rgb(var(--slate-12));
+  font-size: 0.875rem;
+}
+
+.crm-field-control:focus,
+.crm-control:focus,
+.crm-ai-page input:focus,
+.crm-ai-page textarea:focus,
+.crm-ai-page select:focus,
+.crm-inventory-page input:focus,
+.crm-inventory-page textarea:focus,
+.crm-inventory-page select:focus,
+.crm-kanban-page input:focus,
+.crm-kanban-page textarea:focus,
+.crm-kanban-page select:focus {
+  border-color: rgb(var(--border-blue-strong));
+  background: rgb(var(--solid-2));
+  box-shadow: var(--crm-ring);
+  outline: none;
+}
+
+.crm-stage .crm-stage-title,
+.crm-stage .crm-stage-title:focus {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.crm-primary-button,
+.crm-secondary-button,
+.crm-danger-button,
+.crm-icon-button {
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.crm-primary-button {
+  min-height: 2.5rem;
+  border-radius: 0.75rem;
+  background: var(--crm-accent, #ff5b25);
+  color: #fff;
+  box-shadow: none;
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.crm-primary-button:hover {
+  background: var(--crm-accent-hover, #ff6a3a);
+}
+
+.crm-secondary-button,
+.crm-danger-button,
+.crm-icon-button {
+  min-height: 2.5rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.crm-secondary-button,
+.crm-icon-button {
+  border: 1px solid var(--crm-border, rgb(var(--border-weak)));
+  background: var(--crm-surface-muted, rgb(var(--surface-1)));
+  color: rgb(var(--slate-11));
+}
+
+.crm-secondary-button:hover,
+.crm-icon-button:hover {
+  background: rgb(var(--solid-2));
+  color: rgb(var(--slate-12));
+}
+
+.crm-card-chip,
+.crm-status-pill {
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
 .tooltip {
   @apply bg-n-solid-2 text-n-slate-12 py-1 px-2 z-40 text-xs rounded-md max-w-96 shadow-lg outline outline-1 outline-n-container;
 }
