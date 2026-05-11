@@ -28,11 +28,14 @@ Arquivos obrigatorios para qualquer chat novo ler antes de agir:
 - `HANDOFF_CONTINUACAO.md`
 - `HANDOFF_CHATS_01_04.md`
 - `PATAGON.md`
+- `DESIGN_SYSTEM.md`, quando a tarefa envolver frontend/UI
 - `PROMPT_NOVA_CONTA.md`, quando estiver migrando para outra conta/chat
 
 Regra central: cada chat trabalha no seu escopo, atualiza os documentos ao terminar e deixa um handoff claro para o Thiago voltar ao chat atual sem perder contexto.
 
 Regra Patagon: toda feature nova, refatoracao relevante ou mudanca de API/payload/tool/webhook/modelagem deve passar por benchmarking e critica arquitetural antes da execucao.
+
+Regra Design System: Toda alteracao frontend do UnicoCRM deve seguir `DESIGN_SYSTEM.md`. A frente 03 - Style e UI e a fonte de verdade para identidade visual. Outras frentes podem implementar UI funcional, mas nao devem inventar novos padroes visuais sem registrar handoff para a frente 03.
 
 ## Estado global do projeto
 
@@ -414,6 +417,18 @@ Estado atual conhecido:
   - `Sidebar.vue` foi refinado visualmente na busca, botao de composicao e altura dos itens, sem mudar rotas, permissoes ou comportamento;
   - validacao inicial: `git diff --check` passou; build Docker de verificacao `unicocrm-style-check` passou;
   - publicacao/deploy apos pedido explicito do Thiago: commit `657d5f1 style(crm): add SaaS visual foundation` foi enviado para `origin/main`; build Docker de `delvechiotech/unicocrm:latest` passou; push Docker publicou `sha256:c756030a16aa98be58d6aba73414e78af2bc553f76cabae0bca3f960be6a4704`; Portainer concluiu update de `app` e `sidekiq`; health publico respondeu HTTP `200`.
+- Em 2026-05-11, a frente 03 criou `DESIGN_SYSTEM.md` como contrato oficial da identidade visual:
+  - cobre paleta, tokens, tipografia, espacamentos, radius, sombras, botoes, inputs, cards, tabelas, chips, sidebar, estados, responsividade, padroes CRM operacionais e o que evitar;
+  - toda frente que alterar frontend/UI deve ler esse arquivo antes de editar;
+  - frentes funcionais podem implementar UI necessaria, mas nao devem criar padroes visuais novos sem registrar handoff para a frente 03.
+- Segunda rodada visual em 2026-05-11:
+  - referencia `docs_referencia/canvas-visual.aura.build` analisada como DS visual para disciplina de superficies, bordas, tipografia Inter, labels, acento laranja e organizacao, sem copiar efeitos/landing/arquitetura;
+  - `_woot.scss` concentrou tokens e padroes CRM mais completos para cards, inputs, botoes, tabelas, hover/focus e estados ativos;
+  - `_next-colors.scss` ajustou `border-container` dark para separar melhor superficies;
+  - Kanban, Agentes de IA/Produtos e Estoque receberam harmonizacao visual local restrita a CSS/layout: titulos semibold sem tracking negativo, cards/stages com borda/inset sutil, metricas com mais respiro e titulo da etapa sem fundo de input;
+  - nao houve mudanca intencional em controllers, models, migrations, jobs, services, payloads, Quepasa ou contratos de API;
+  - validacao: `git diff --check` passou e busca por `letter-spacing` negativo nos arquivos CRM nao encontrou ocorrencias;
+  - pendente: QA visual em browser e deploy somente mediante pedido explicito.
 - Apos a instrucao permanente de fazer build/push/deploy ao terminar etapa, o build Docker local passou; depois de confirmacao explicita do Thiago, o push Docker tambem passou e o redeploy Portainer foi executado. `chatwoot_chatwoot_app` e `chatwoot_chatwoot_sidekiq` retornaram update `completed` no digest `sha256:3e79f75b2518301222e297311d50da3655ea7976fa90c3cb72edf10f76e5f4c2`; health check publico local ficou inconclusivo por falhas de conexao HTTPS/intermitencia.
 - Build/push/deploy da frente Style/UI publicou `delvechiotech/unicocrm:latest@sha256:92af187b6874228fd4d3e17c585dd28dbc6da1a91b9e5e23775120c39dcd0d7f`.
 - Portainer stack `chatwoot` atualizou `app` e `sidekiq`; health check final em `https://chat.unicocrm.com/` respondeu HTTP `200 OK`.

@@ -25,7 +25,7 @@ class Api::V1::Accounts::Crm::AiAgentToolsController < Api::V1::Accounts::BaseCo
 
   def search_kanban_cards
     query = search_params[:q].to_s.strip
-    cards = kanban_pipeline.cards.active.includes(:stage, :contact, :conversation).order(updated_at: :desc).limit(search_limit)
+    cards = kanban_pipeline.cards.active.includes(:stage, :contact, :conversation, :product).order(updated_at: :desc).limit(search_limit)
     cards = cards.where(kanban_search_clause, query: "%#{query}%") if query.present?
 
     render json: {
@@ -152,10 +152,26 @@ class Api::V1::Accounts::Crm::AiAgentToolsController < Api::V1::Accounts::BaseCo
       stale_level: card.stale_level,
       next_activity_at: card.next_activity_at,
       ai_rules: kanban_pipeline.ai_rules,
+      product: product_payload(card.product),
       contact: card.contact&.as_json(only: [:id, :name, :email, :phone_number]),
       conversation: card.conversation&.as_json(only: [:id, :display_id, :status, :last_activity_at]),
       activities: card.activities.open_status.ordered.limit(5).map { |activity| kanban_activity_payload(activity) }
     }
+  end
+
+  def product_payload(product)
+    return nil if product.blank?
+
+    product.as_json(
+      only: [
+        :id, :name, :sku, :price, :currency, :availability_status, :track_inventory,
+        :stock_quantity, :reserved_quantity, :low_stock_threshold
+      ]
+    ).merge(
+      available_quantity: product.available_quantity,
+      low_stock: product.low_stock?,
+      sale_available: product.sale_available?
+    )
   end
 
   def kanban_activity_payload(activity)

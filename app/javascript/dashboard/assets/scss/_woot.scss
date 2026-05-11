@@ -59,10 +59,19 @@ button {
   --crm-space-card: 1.5rem;
   --crm-surface-card: rgb(var(--surface-2));
   --crm-surface-muted: rgb(var(--surface-1));
+  --crm-surface-raised: rgb(var(--solid-2));
+  --crm-surface-hover: rgb(var(--solid-3));
   --crm-border: rgb(var(--border-weak));
+  --crm-border-soft: rgba(var(--border-container));
+  --crm-muted: rgb(var(--slate-10));
+  --crm-muted-strong: rgb(var(--slate-11));
+  --crm-accent-soft: rgba(255, 91, 37, 0.1);
+  --crm-accent-border: rgba(255, 91, 37, 0.28);
   --crm-field-bg: rgba(var(--background-input-box));
   --crm-ring: 0 0 0 3px rgba(255, 91, 37, 0.14);
   --crm-shadow: none;
+  --crm-card-inset: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  --crm-transition: 160ms ease;
 
   font-family:
     'Inter',
@@ -71,7 +80,20 @@ button {
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
+  background: rgb(var(--background-color));
   color: rgb(var(--slate-12));
+}
+
+.dark .crm-ai-page,
+.dark .crm-inventory-page,
+.dark .crm-kanban-page {
+  --crm-surface-card: hsl(220deg 15% 11%);
+  --crm-surface-muted: hsl(220deg 15% 8%);
+  --crm-surface-raised: rgb(28 31 37);
+  --crm-surface-hover: rgb(32 36 43);
+  --crm-border: rgb(40 44 51);
+  --crm-border-soft: rgba(255, 255, 255, 0.08);
+  --crm-field-bg: rgba(12, 14, 17, 0.78);
 }
 
 .crm-ai-page h1,
@@ -104,7 +126,26 @@ button {
 .crm-ai-page p,
 .crm-inventory-page p,
 .crm-kanban-page p {
+  color: rgb(var(--slate-11));
   letter-spacing: 0;
+}
+
+.crm-ai-header,
+.crm-inventory-header,
+.crm-page-header {
+  border-color: var(--crm-border);
+  background: rgb(var(--background-color));
+}
+
+.crm-ai-shell,
+.crm-products-shell,
+.crm-inventory-shell,
+.crm-workspace,
+.crm-editor-panel,
+.crm-resource-list,
+.crm-playground-panel,
+.crm-board-scroll {
+  background: rgb(var(--background-color));
 }
 
 .crm-form-card,
@@ -120,7 +161,7 @@ button {
   border-color: var(--crm-border);
   border-radius: var(--crm-radius-md);
   background: var(--crm-surface-card);
-  box-shadow: var(--crm-shadow);
+  box-shadow: var(--crm-card-inset), var(--crm-shadow);
 }
 
 .crm-form-card,
@@ -129,7 +170,31 @@ button {
 }
 
 .crm-metric-card {
-  min-height: 5rem;
+  min-height: 5.25rem;
+  padding: 1rem;
+}
+
+.crm-resource-card,
+.crm-inventory-item,
+.crm-deal-card {
+  transition:
+    border-color var(--crm-transition),
+    background-color var(--crm-transition),
+    color var(--crm-transition),
+    transform var(--crm-transition);
+}
+
+.crm-resource-card:hover,
+.crm-inventory-item:hover,
+.crm-deal-card:hover {
+  border-color: var(--crm-accent-border);
+  background: var(--crm-surface-raised);
+}
+
+.crm-resource-card.is-active,
+.crm-inventory-item.is-active {
+  border-color: var(--crm-accent-border);
+  background: var(--crm-accent-soft);
 }
 
 .crm-field-label,
@@ -160,6 +225,20 @@ button {
   background: var(--crm-field-bg);
   color: rgb(var(--slate-12));
   font-size: 0.875rem;
+  min-height: 2.5rem;
+  transition:
+    border-color var(--crm-transition),
+    background-color var(--crm-transition),
+    box-shadow var(--crm-transition);
+}
+
+.crm-ai-page input::placeholder,
+.crm-ai-page textarea::placeholder,
+.crm-inventory-page input::placeholder,
+.crm-inventory-page textarea::placeholder,
+.crm-kanban-page input::placeholder,
+.crm-kanban-page textarea::placeholder {
+  color: rgb(var(--slate-10));
 }
 
 .crm-field-control:focus,
@@ -189,7 +268,10 @@ button {
 .crm-primary-button,
 .crm-secondary-button,
 .crm-danger-button,
-.crm-icon-button {
+.crm-icon-button,
+.crm-ai-page button,
+.crm-inventory-page button,
+.crm-kanban-page button {
   transition:
     border-color 160ms ease,
     background-color 160ms ease,
@@ -197,7 +279,13 @@ button {
     transform 160ms ease;
 }
 
-.crm-primary-button {
+.crm-primary-button,
+.crm-ai-page button.bg-n-brand,
+.crm-ai-page button.bg-n-blue-9,
+.crm-inventory-page button.bg-n-brand,
+.crm-inventory-page button.bg-n-blue-9,
+.crm-kanban-page button.bg-n-brand,
+.crm-kanban-page button.bg-n-blue-9 {
   min-height: 2.5rem;
   border-radius: 0.75rem;
   background: var(--crm-accent, #ff5b25);
@@ -207,7 +295,13 @@ button {
   font-weight: 650;
 }
 
-.crm-primary-button:hover {
+.crm-primary-button:hover,
+.crm-ai-page button.bg-n-brand:hover,
+.crm-ai-page button.bg-n-blue-9:hover,
+.crm-inventory-page button.bg-n-brand:hover,
+.crm-inventory-page button.bg-n-blue-9:hover,
+.crm-kanban-page button.bg-n-brand:hover,
+.crm-kanban-page button.bg-n-blue-9:hover {
   background: var(--crm-accent-hover, #ff6a3a);
 }
 
@@ -239,6 +333,38 @@ button {
   font-size: 0.6875rem;
   font-weight: 650;
   letter-spacing: 0;
+}
+
+.crm-ai-page table,
+.crm-inventory-page table,
+.crm-kanban-page table {
+  border-collapse: collapse;
+}
+
+.crm-ai-page th,
+.crm-ai-page td,
+.crm-inventory-page th,
+.crm-inventory-page td,
+.crm-kanban-page th,
+.crm-kanban-page td {
+  border-bottom: 1px solid var(--crm-border);
+  padding: 1rem;
+}
+
+.crm-ai-page th,
+.crm-inventory-page th,
+.crm-kanban-page th {
+  color: rgb(var(--slate-10));
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.crm-ai-page tr:hover td,
+.crm-inventory-page tr:hover td,
+.crm-kanban-page tr:hover td {
+  background: rgba(var(--alpha-1));
 }
 
 .tooltip {

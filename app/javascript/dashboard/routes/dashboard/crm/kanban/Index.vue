@@ -1133,8 +1133,8 @@ onMounted(loadBoard);
 .crm-title-row h1 {
   color: rgb(var(--slate-12));
   font-size: clamp(1.5rem, 1.8vw, 2rem);
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-weight: 650;
+  letter-spacing: 0;
   line-height: 1.12;
 }
 
@@ -1154,7 +1154,7 @@ onMounted(loadBoard);
 
 .crm-eyebrow {
   border: 1px solid rgb(var(--border-weak));
-  background: rgb(var(--surface-1));
+  background: rgba(var(--alpha-1));
   color: rgb(var(--slate-10));
   padding: 0.25rem 0.625rem;
   letter-spacing: 0;
@@ -1203,9 +1203,9 @@ onMounted(loadBoard);
 
 .crm-metric-card {
   position: relative;
-  min-height: 4.75rem;
+  min-height: 5.5rem;
   overflow: hidden;
-  padding: 1rem;
+  padding: 1.125rem;
   background: rgb(var(--surface-2));
   box-shadow: none;
 }
@@ -1259,15 +1259,15 @@ onMounted(loadBoard);
   overflow: hidden;
   border-color: rgb(var(--border-weak));
   background: rgb(var(--surface-2));
-  box-shadow: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
 }
 
 .crm-stage > div:first-child {
-  padding: 1rem;
+  padding: 1.125rem;
 }
 
 .crm-stage > div:last-child {
-  padding: 1rem;
+  padding: 1.125rem;
 }
 
 .crm-stage::before {
@@ -1310,7 +1310,8 @@ onMounted(loadBoard);
 
 .crm-stage-title {
   min-height: 2rem;
-  padding: 0.25rem 0.35rem;
+  padding: 0.25rem 0;
+  background: transparent;
 }
 
 .crm-stage-number {
@@ -1363,7 +1364,7 @@ onMounted(loadBoard);
   border-color: rgb(var(--border-weak));
   background: rgb(var(--surface-2));
   padding: 1rem;
-  box-shadow: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease,
@@ -1556,7 +1557,7 @@ button:disabled {
 }
 
 :global(.dark) .crm-kanban-page {
-  --background-color: 17 19 23;
+  --background-color: 13 15 19;
   --surface-1: 13 14 18;
   --surface-2: 24 27 32;
   --solid-1: 24 27 32;

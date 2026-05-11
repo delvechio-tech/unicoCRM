@@ -34,6 +34,12 @@
 
 ## Styling
 
+- **UnicoCRM Design System**:
+  - Before any frontend/UI change in UnicoCRM, read `DESIGN_SYSTEM.md`.
+  - Every frontend change must follow `DESIGN_SYSTEM.md`.
+  - `03 - Style e UI` is the source of truth for visual identity.
+  - Other fronts may implement functional UI, but must not invent new visual patterns without registering handoff for front 03.
+  - External visual references in `docs_referencia` may inform hierarchy, spacing, surfaces and interaction polish, but do not override `DESIGN_SYSTEM.md` or justify copying landing-page effects into operational CRM screens.
 - **Tailwind Only**:  
   - Do not write custom CSS  
   - Do not use scoped CSS  
@@ -54,6 +60,14 @@
 - Don’t write multiple versions or backups for the same logic — pick the best approach and implement it
 - Prefer `with_modified_env` (from spec helpers) over stubbing `ENV` directly in specs
 - Specs in parallel/reloading environments: prefer comparing `error.class.name` over constant class equality when asserting raised errors
+
+## UnicoCRM Operating Gates
+
+- Before any new feature, relevant refactor, API/payload/tool/webhook/model change, or CRM workflow change, apply `PATAGON.md`.
+- Use GSD for scope, handoff, sequencing, and project state.
+- Use GitNexus for code impact, callers, route/tool blast radius, and execution-flow analysis.
+- Use Patagon for benchmarking, architectural critique, performance/scale review, and "what not to copy" decisions before implementation.
+- Recommended order for meaningful work: GSD status -> GitNexus context/impact -> Patagon gate -> implementation -> validation -> handoff.
 
 ## Codex Worktree Workflow
 

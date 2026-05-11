@@ -173,6 +173,8 @@ Regra para este chat:
 Estado atual deste chat:
 
 - Frente responsavel por tema, cores, sidebar, consistencia visual e acabamento das telas CRM.
+- `DESIGN_SYSTEM.md` passa a ser a fonte de verdade da identidade visual UnicoCRM.
+- Toda alteracao frontend do UnicoCRM deve seguir `DESIGN_SYSTEM.md`. A frente 03 - Style e UI e a fonte de verdade para identidade visual. Outras frentes podem implementar UI funcional, mas nao devem inventar novos padroes visuais sem registrar handoff para a frente 03.
 - Em 2026-05-09, foi aplicada revisao visual/responsiva nas telas CRM inspirada na sensacao de produto SaaS limpo como Twenty, sem analisar/copiar o projeto em `docs_referencia`.
 - Design system mudou o acento principal para teal/verde sobrio e suavizou superficies, bordas, estados ativos, inputs, tooltips e selecao de texto.
 - Tipografia utilitaria removeu letter-spacing negativo.
@@ -236,6 +238,17 @@ Estado atual deste chat:
   - escopo visual apenas; sem controller, model, migration, job, service, payload, Quepasa ou contrato alterado;
   - validacao inicial: `git diff --check` passou e `docker image build -f docker/Dockerfile -t unicocrm-style-check .` passou;
   - publicacao/deploy apos pedido explicito do Thiago: commit `657d5f1 style(crm): add SaaS visual foundation` foi enviado para `origin/main`; `docker image build -f docker/Dockerfile -t delvechiotech/unicocrm:latest .` passou; `docker image push delvechiotech/unicocrm:latest` publicou `sha256:c756030a16aa98be58d6aba73414e78af2bc553f76cabae0bca3f960be6a4704`; Portainer redeployou a stack; `app` e `sidekiq` ficaram `completed`; health publico HTTP `200`. Houve `502` temporario durante boot e falhas TLS intermitentes no PowerShell contra Portainer, mas validacao via Node confirmou status.
+- Em 2026-05-11, foi criado `DESIGN_SYSTEM.md`:
+  - documenta paleta, tokens, tipografia, espacamentos, radius, sombras, botoes, inputs/selects/textareas, cards/paineis, tabelas/listas, chips/badges/status, sidebar/navegacao, estados, responsividade, padroes CRM operacionais e anti-padroes visuais;
+  - regra para proximas frentes: se a tarefa envolver frontend/UI, ler `DESIGN_SYSTEM.md` antes de editar e registrar handoff para a frente 03 quando houver necessidade de novo padrao visual.
+- Em 2026-05-11, foi aplicada segunda rodada visual usando `DESIGN_SYSTEM.md` e a referencia `docs_referencia/canvas-visual.aura.build`:
+  - adaptado: Inter, dark mode operacional, cards por superficie/borda, labels pequenas, acento laranja moderado, metricas com mais respiro e hierarquia mais clara;
+  - nao copiado: hero/landing, beams, glow forte, cards inclinados, efeitos decorativos e arquitetura externa;
+  - `_woot.scss` passou a concentrar tokens visuais CRM mais completos e padroes comuns para cards, inputs, botoes, tabelas, hover/focus e estados ativos;
+  - `_next-colors.scss` recebeu ajuste visual pequeno em `border-container` no dark mode;
+  - CSS local de Kanban, Agentes de IA/Produtos e Estoque foi harmonizado visualmente com o DS, sem alterar scripts, chamadas de API ou contratos;
+  - validacao: `git diff --check` passou e busca por `letter-spacing` negativo nos arquivos CRM nao encontrou ocorrencias;
+  - pendente: QA visual em browser para desktop/notebook/iPad e build/deploy apenas se o Thiago pedir explicitamente.
 - Deve evitar mudar regra de negocio, migrations, jobs ou providers.
 
 Arquivos sensiveis:

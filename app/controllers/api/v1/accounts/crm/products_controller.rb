@@ -37,7 +37,9 @@ class Api::V1::Accounts::Crm::ProductsController < Api::V1::Accounts::BaseContro
   def product_params
     permitted = params.require(:product).permit(
       :name, :sku, :category, :currency, :price, :active, :description,
-      :faq, :objections, :media_notes, metadata: {}, media_files: []
+      :faq, :objections, :media_notes, :availability_status, :stock_quantity,
+      :reserved_quantity, :low_stock_threshold, :track_inventory,
+      metadata: {}, media_files: []
     )
 
     permitted[:metadata] = parsed_metadata(permitted[:metadata]) if permitted[:metadata].present?
@@ -52,6 +54,9 @@ class Api::V1::Accounts::Crm::ProductsController < Api::V1::Accounts::BaseContro
 
   def product_payload(product)
     product.as_json.merge(
+      available_quantity: product.available_quantity,
+      low_stock: product.low_stock?,
+      sale_available: product.sale_available?,
       media_files: product.media_files.map { |file| media_file_payload(file) }
     )
   end

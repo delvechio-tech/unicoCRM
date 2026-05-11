@@ -162,10 +162,11 @@ class Crm::AiAgents::PayloadBuilder
     {
       knowledge_policy: [
         'Use tool_urls to fetch product and FAQ data on demand.',
-        'Do not assume product prices, availability, or policies that were not returned by the tools.'
+        'Do not assume product prices, availability, quantities, reservations, or policies that were not returned by the tools.'
       ].join(' '),
       product_policy: [
         'Search products before recommending a specific product.',
+        'Check availability_status, sale_available, and available_quantity before saying an item can be sold.',
         'Ask a clarification question when the search result is empty or ambiguous.'
       ].join(' '),
       kanban_policy: [

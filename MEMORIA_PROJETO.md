@@ -190,6 +190,12 @@ Nao montar volume externo em `/app/public`, pois isso pode servir assets antigos
 
 ## Style / UI visual
 
+Regra permanente de Design System:
+
+- Toda alteracao frontend do UnicoCRM deve seguir `DESIGN_SYSTEM.md`.
+- A frente `03 - Style e UI` e a fonte de verdade para identidade visual.
+- Outras frentes podem implementar UI funcional, mas nao devem inventar novos padroes visuais sem registrar handoff para a frente 03.
+
 Revisao visual aplicada em 2026-05-09:
 
 - Objetivo: tornar a interface CRM mais agradavel, clara e adaptavel a computador, notebook e iPad, inspirada na sensacao de produto SaaS limpo como Twenty, sem copiar arquitetura nem gastar tempo analisando `docs_referencia`.
@@ -223,6 +229,10 @@ Revisao visual aplicada em 2026-05-09:
   - painel lateral foi aproximado do atendimento comercial, com avatar maior, texto de cliente/conversa e botoes de salvar/arquivar/agendar com icones;
   - texto da acao de remocao foi alinhado ao contrato real: a UI agora fala em arquivar, pois o historico comercial deve ser preservado;
   - nao houve alteracao intencional em API, models, jobs, migrations, sync de mensagem, webhooks ou tools de IA nesta rodada visual.
+- Em 2026-05-11, foi criado `DESIGN_SYSTEM.md` como contrato oficial da identidade visual UnicoCRM:
+  - define paleta, tokens, tipografia, espacamentos, radius, sombras, botoes, inputs, cards, tabelas, chips, sidebar, estados e responsividade;
+  - deve ser lido antes de qualquer alteracao frontend/UI;
+  - consolidou a direcao SaaS moderna, limpa, operacional e sofisticada para telas CRM.
   - `docs_referencia` nao estava presente neste checkout; Planka e Whaticket foram usados apenas como referencia conceitual de visual/UX, sem copiar codigo.
 - Build desta etapa visual:
   - `docker build -f docker/Dockerfile -t delvechiotech/unicocrm:latest .` concluiu com sucesso em 2026-05-09;
@@ -272,6 +282,14 @@ Revisao visual aplicada em 2026-05-09:
   - escopo ficou visual; nao houve alteracao de regra de negocio, controllers, models, migrations, jobs, services, Quepasa, payloads ou contratos;
   - validacao inicial: `git diff --check` passou nos arquivos visuais e `docker image build -f docker/Dockerfile -t unicocrm-style-check .` passou;
   - publicacao em 2026-05-11 apos pedido explicito do Thiago: commit `657d5f1 style(crm): add SaaS visual foundation` enviado para `origin/main`; build Docker de `delvechiotech/unicocrm:latest` passou; push Docker publicou digest `sha256:c756030a16aa98be58d6aba73414e78af2bc553f76cabae0bca3f960be6a4704`; Portainer aceitou redeploy; `chatwoot_chatwoot_app` e `chatwoot_chatwoot_sidekiq` ficaram `completed` nesse digest; `https://chat.unicocrm.com/` e `/health` responderam HTTP `200`. Houve `502` temporario durante boot e falhas TLS intermitentes no PowerShell contra a API Portainer, contornadas com validacao via Node.
+- Segunda rodada da identidade visual SaaS em 2026-05-11:
+  - referencia `docs_referencia/canvas-visual.aura.build` analisada como inspiracao de design system, nao como fonte de codigo: adaptar disciplina de superfices, bordas, Inter, labels pequenas, acento laranja e respiro; nao copiar hero, beams, glow, cards inclinados ou visual de landing page;
+  - `_woot.scss` ganhou refinamento de tokens CRM (`surface-raised`, `surface-hover`, bordas suaves, acento soft, transicoes), cards com borda/inset sutil, inputs com altura/foco consistente, botoes primarios laranja e tabelas com padding/bordas horizontais;
+  - `_next-colors.scss` passou a expor `border-container` visivel no dark mode para melhorar separacao de paineis e tooltips;
+  - estilos locais de Kanban, Agentes de IA/Produtos e Estoque foram ajustados apenas visualmente para remover tracking negativo, reforcar titulos semibold, alinhar metricas/cards/stages ao DS e manter o titulo da etapa sem fundo de input;
+  - Patagon: decisao foi seguir uma identidade SaaS operacional inspirada em Canvas/Linear, mantendo densidade de CRM e evitando animacoes/gradientes/efeitos de marketing;
+  - escopo intencional restrito a CSS/SCSS e classes/layout visual; nao houve alteracao intencional em regras de negocio, controllers, models, migrations, jobs, services, Quepasa, payloads ou contratos;
+  - validacao: `git diff --check` passou e busca por `letter-spacing` negativo nos arquivos CRM nao encontrou ocorrencias; nao houve pedido de push/deploy nesta rodada.
 - Rodada Kanban visual em 2026-05-09:
   - `git diff --check` passou;
   - `docker build -f docker/Dockerfile -t delvechiotech/unicocrm:latest .` passou e gerou manifest list local `sha256:e38da08d1b0e3f84451b69cd88a865f69658d17f9f33608b37a16c9a63b20695`;

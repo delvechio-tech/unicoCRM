@@ -316,7 +316,16 @@ class Api::V1::Accounts::Crm::KanbanController < Api::V1::Accounts::BaseControll
   def product_payload(product)
     return nil if product.blank?
 
-    product.as_json(only: [:id, :name, :price, :currency])
+    product.as_json(
+      only: [
+        :id, :name, :price, :currency, :availability_status, :track_inventory,
+        :stock_quantity, :reserved_quantity, :low_stock_threshold
+      ]
+    ).merge(
+      available_quantity: product.available_quantity,
+      low_stock: product.low_stock?,
+      sale_available: product.sale_available?
+    )
   end
 
   def user_payload(user)

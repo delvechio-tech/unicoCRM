@@ -40,6 +40,13 @@ const salesTechniqueOptions = [
 
 const roleOptions = ['Vendas', 'SDR', 'Suporte', 'CS', 'Ecommerce'];
 
+const availabilityOptions = [
+  { value: 'in_stock', label: 'Disponivel' },
+  { value: 'out_of_stock', label: 'Sem estoque' },
+  { value: 'pre_order', label: 'Pre-venda' },
+  { value: 'discontinued', label: 'Descontinuado' },
+];
+
 const agentSections = [
   {
     key: 'profile',
@@ -96,6 +103,11 @@ const productForm = reactive({
   currency: 'BRL',
   price: '',
   active: true,
+  availability_status: 'in_stock',
+  track_inventory: false,
+  stock_quantity: 0,
+  reserved_quantity: 0,
+  low_stock_threshold: 0,
   description: '',
   faq: '',
   objections: '',
@@ -172,6 +184,11 @@ const resetProductForm = () => {
     currency: 'BRL',
     price: '',
     active: true,
+    availability_status: 'in_stock',
+    track_inventory: false,
+    stock_quantity: 0,
+    reserved_quantity: 0,
+    low_stock_threshold: 0,
     description: '',
     faq: '',
     objections: '',
@@ -250,6 +267,11 @@ const editProduct = product => {
     currency: product.currency || 'BRL',
     price: product.price || '',
     active: product.active,
+    availability_status: product.availability_status || 'in_stock',
+    track_inventory: product.track_inventory || false,
+    stock_quantity: product.stock_quantity || 0,
+    reserved_quantity: product.reserved_quantity || 0,
+    low_stock_threshold: product.low_stock_threshold || 0,
     description: product.description || '',
     faq: product.faq || '',
     objections: product.objections || '',
@@ -484,7 +506,7 @@ onMounted(loadData);
         <div class="flex rounded-lg border border-n-weak bg-n-alpha-2 p-1">
           <button
             type="button"
-            class="flex h-9 items-center gap-2 rounded-md px-4 text-sm font-medium transition-colors"
+            class="flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-medium transition-colors"
             :class="
               activeResource === 'agents'
                 ? 'bg-n-solid-2 text-n-slate-12'
@@ -497,7 +519,7 @@ onMounted(loadData);
           </button>
           <button
             type="button"
-            class="flex h-9 items-center gap-2 rounded-md px-4 text-sm font-medium transition-colors"
+            class="flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-medium transition-colors"
             :class="
               activeResource === 'products'
                 ? 'bg-n-solid-2 text-n-slate-12'
@@ -595,7 +617,7 @@ onMounted(loadData);
             <button
               v-if="selectedAgent"
               type="button"
-              class="flex h-9 items-center gap-2 rounded-lg px-3 text-sm text-n-ruby-10 hover:bg-n-ruby-3"
+              class="flex h-10 items-center gap-2 rounded-xl px-3 text-sm text-n-ruby-10 hover:bg-n-ruby-3"
               @click="deleteAgent(selectedAgent)"
             >
               <span class="i-lucide-trash-2 size-4" />
@@ -603,7 +625,7 @@ onMounted(loadData);
             </button>
             <button
               type="submit"
-              class="flex h-9 items-center gap-2 rounded-lg bg-n-brand px-4 text-sm font-semibold text-white hover:brightness-110"
+              class="flex h-10 items-center gap-2 rounded-xl bg-n-brand px-4 text-sm font-semibold text-white hover:brightness-110"
             >
               <span class="i-lucide-save size-4" />
               Salvar
@@ -631,7 +653,7 @@ onMounted(loadData);
 
         <section
           v-if="activeAgentSection === 'profile'"
-          class="rounded-lg border border-n-weak bg-n-solid-1 p-5"
+          class="rounded-lg border border-n-weak bg-n-solid-1 p-6"
         >
           <div class="grid gap-4 md:grid-cols-2">
             <label class="block">
@@ -677,7 +699,7 @@ onMounted(loadData);
 
         <section
           v-if="activeAgentSection === 'knowledge'"
-          class="rounded-lg border border-n-weak bg-n-solid-1 p-5"
+          class="rounded-lg border border-n-weak bg-n-solid-1 p-6"
         >
           <div class="mb-4 flex items-center justify-between gap-3">
             <div>
@@ -688,7 +710,7 @@ onMounted(loadData);
             </div>
             <button
               type="button"
-              class="flex h-9 items-center gap-2 rounded-lg border border-n-weak px-3 text-sm text-n-slate-12 hover:bg-n-alpha-2"
+              class="flex h-10 items-center gap-2 rounded-xl border border-n-weak px-3 text-sm text-n-slate-12 hover:bg-n-alpha-2"
               @click="activeResource = 'products'"
             >
               <span class="i-lucide-package-plus size-4" />
@@ -714,7 +736,7 @@ onMounted(loadData);
               class="rounded-lg border p-3 text-left transition-colors"
               :class="
                 agentForm.product_ids.includes(product.id)
-                  ? 'border-n-teal-8 bg-n-teal-3/30'
+                  ? 'border-n-blue-8 bg-n-blue-3/40'
                   : 'border-n-weak hover:bg-n-alpha-2'
               "
               @click="toggleArrayValue(agentForm.product_ids, product.id)"
@@ -729,7 +751,7 @@ onMounted(loadData);
                   </p>
                 </div>
                 <span
-                  class="i-lucide-check size-4 text-n-teal-10"
+                  class="i-lucide-check size-4 text-n-blue-10"
                   :class="{ invisible: !agentForm.product_ids.includes(product.id) }"
                 />
               </div>
@@ -739,7 +761,7 @@ onMounted(loadData);
 
         <section
           v-if="activeAgentSection === 'behavior'"
-          class="rounded-lg border border-n-weak bg-n-solid-1 p-5"
+          class="rounded-lg border border-n-weak bg-n-solid-1 p-6"
         >
           <div class="grid gap-5">
             <div>
@@ -807,7 +829,7 @@ onMounted(loadData);
 
         <section
           v-if="activeAgentSection === 'channels'"
-          class="rounded-lg border border-n-weak bg-n-solid-1 p-5"
+          class="rounded-lg border border-n-weak bg-n-solid-1 p-6"
         >
           <div class="mb-4">
             <h3 class="text-base font-semibold text-n-slate-12">Caixas atendidas</h3>
@@ -824,7 +846,7 @@ onMounted(loadData);
               class="rounded-lg border p-3 text-left transition-colors"
               :class="
                 agentForm.inbox_ids.includes(inbox.id)
-                  ? 'border-n-teal-8 bg-n-teal-3/30'
+                  ? 'border-n-blue-8 bg-n-blue-3/40'
                   : 'border-n-weak hover:bg-n-alpha-2'
               "
               @click="toggleArrayValue(agentForm.inbox_ids, inbox.id)"
@@ -834,7 +856,7 @@ onMounted(loadData);
                   {{ inbox.name }}
                 </span>
                 <span
-                  class="i-lucide-check size-4 text-n-teal-10"
+                  class="i-lucide-check size-4 text-n-blue-10"
                   :class="{ invisible: !agentForm.inbox_ids.includes(inbox.id) }"
                 />
               </div>
@@ -847,7 +869,7 @@ onMounted(loadData);
 
         <section
           v-if="activeAgentSection === 'automation'"
-          class="rounded-lg border border-n-weak bg-n-solid-1 p-5"
+          class="rounded-lg border border-n-weak bg-n-solid-1 p-6"
         >
           <div class="grid gap-5">
             <label class="block">
@@ -866,7 +888,7 @@ onMounted(loadData);
                 class="rounded-lg border p-4 text-left transition-colors"
                 :class="
                   agentForm.active
-                    ? 'border-n-teal-8 bg-n-teal-3/30'
+                    ? 'border-n-blue-8 bg-n-blue-3/40'
                     : 'border-n-weak hover:bg-n-alpha-2'
                 "
                 @click="agentForm.active = !agentForm.active"
@@ -924,7 +946,7 @@ onMounted(loadData);
 
             <button
               type="button"
-              class="flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-n-brand px-3 text-sm font-semibold text-white transition-opacity hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+              class="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-n-brand px-3 text-sm font-semibold text-white transition-opacity hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
               :disabled="isPlaygroundLoading"
               @click="runPlayground"
             >
@@ -1040,7 +1062,7 @@ onMounted(loadData);
             <button
               v-if="selectedProduct"
               type="button"
-              class="flex h-9 items-center gap-2 rounded-lg px-3 text-sm text-n-ruby-10 hover:bg-n-ruby-3"
+              class="flex h-10 items-center gap-2 rounded-xl px-3 text-sm text-n-ruby-10 hover:bg-n-ruby-3"
               @click="deleteProduct(selectedProduct)"
             >
               <span class="i-lucide-trash-2 size-4" />
@@ -1048,7 +1070,7 @@ onMounted(loadData);
             </button>
             <button
               type="submit"
-              class="flex h-9 items-center gap-2 rounded-lg bg-n-brand px-4 text-sm font-semibold text-white hover:brightness-110"
+              class="flex h-10 items-center gap-2 rounded-xl bg-n-brand px-4 text-sm font-semibold text-white hover:brightness-110"
             >
               <span class="i-lucide-save size-4" />
               Salvar
@@ -1057,9 +1079,9 @@ onMounted(loadData);
         </div>
 
         <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <section class="space-y-5">
+          <section class="space-y-6">
             <div class="crm-form-card rounded-lg border border-n-weak bg-n-solid-1 p-6">
-              <h3 class="mb-5 text-base font-bold text-n-slate-12">Identificacao</h3>
+              <h3 class="mb-5 text-base font-semibold tracking-tight text-n-slate-12">Identificacao</h3>
               <div class="grid grid-cols-12 gap-4">
                 <label class="col-span-12 block md:col-span-8">
                   <span class="crm-field-label">Nome</span>
@@ -1111,7 +1133,72 @@ onMounted(loadData);
             </div>
 
             <div class="crm-form-card rounded-lg border border-n-weak bg-n-solid-1 p-6">
-              <h3 class="mb-5 text-base font-bold text-n-slate-12">Conteudo usado pela IA</h3>
+              <h3 class="mb-5 text-base font-semibold tracking-tight text-n-slate-12">Estoque</h3>
+              <div class="grid grid-cols-12 gap-4">
+                <label class="col-span-12 block md:col-span-4">
+                  <span class="crm-field-label">Disponibilidade</span>
+                  <select v-model="productForm.availability_status" class="crm-field-control">
+                    <option
+                      v-for="option in availabilityOptions"
+                      :key="option.value"
+                      :value="option.value"
+                    >
+                      {{ option.label }}
+                    </option>
+                  </select>
+                </label>
+                <label class="col-span-12 flex items-end md:col-span-4">
+                  <button
+                    type="button"
+                    class="crm-stock-toggle"
+                    :class="{ 'is-on': productForm.track_inventory }"
+                    @click="productForm.track_inventory = !productForm.track_inventory"
+                  >
+                    <span class="i-lucide-clipboard-list size-4" />
+                    {{ productForm.track_inventory ? 'Controlado' : 'Sem controle' }}
+                  </button>
+                </label>
+                <label class="col-span-12 block md:col-span-4">
+                  <span class="crm-field-label">Alerta baixo</span>
+                  <input
+                    v-model="productForm.low_stock_threshold"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    class="crm-field-control"
+                  />
+                </label>
+                <label class="col-span-12 block md:col-span-4">
+                  <span class="crm-field-label">Quantidade</span>
+                  <input
+                    v-model="productForm.stock_quantity"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    class="crm-field-control"
+                  />
+                </label>
+                <label class="col-span-12 block md:col-span-4">
+                  <span class="crm-field-label">Reservado</span>
+                  <input
+                    v-model="productForm.reserved_quantity"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    class="crm-field-control"
+                  />
+                </label>
+                <div class="col-span-12 md:col-span-4">
+                  <span class="crm-field-label">Disponivel</span>
+                  <div class="crm-stock-summary">
+                    {{ productForm.track_inventory ? Math.max(Number(productForm.stock_quantity || 0) - Number(productForm.reserved_quantity || 0), 0) : 'Livre' }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="crm-form-card rounded-lg border border-n-weak bg-n-solid-1 p-6">
+              <h3 class="mb-5 text-base font-semibold tracking-tight text-n-slate-12">Conteudo usado pela IA</h3>
               <div class="grid gap-4">
                 <label class="block">
                   <span class="mb-1.5 block text-sm font-medium text-n-slate-12">Descricao</span>
@@ -1378,14 +1465,32 @@ onMounted(loadData);
 
 <style scoped>
 .crm-ai-page {
-  --crm-panel-radius: 10px;
+  --crm-panel-radius: 12px;
   --crm-page-padding: clamp(1rem, 1.8vw, 1.75rem);
+  --crm-card-shadow: none;
 }
 
 .crm-ai-header {
   padding: var(--crm-page-padding);
-  background:
-    linear-gradient(180deg, rgb(var(--surface-1)) 0%, rgb(var(--background-color)) 100%);
+  background: rgb(var(--background-color));
+}
+
+.crm-ai-header h1 {
+  color: rgb(var(--slate-12));
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.crm-ai-header > div > div:first-child > div:first-child {
+  display: inline-flex;
+  border: 1px solid rgb(var(--border-weak));
+  border-radius: 999px;
+  background: rgba(var(--alpha-1));
+  padding: 0.25rem 0.625rem;
+  color: rgb(var(--slate-10));
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
 .crm-ai-shell,
@@ -1399,11 +1504,13 @@ onMounted(loadData);
 }
 
 .crm-resource-list {
-  background: rgb(var(--surface-1));
+  background: rgb(var(--background-color));
 }
 
 .crm-resource-card {
+  border-color: rgb(var(--border-weak));
   background: rgb(var(--surface-2));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025), var(--crm-card-shadow);
 }
 
 .crm-resource-card:hover {
@@ -1415,9 +1522,66 @@ onMounted(loadData);
   padding: var(--crm-page-padding);
 }
 
+.crm-editor-panel > * {
+  width: 100%;
+  max-width: 64rem;
+  margin-inline: auto;
+}
+
+.crm-products-shell .crm-editor-panel > * {
+  max-width: 72rem;
+}
+
 .crm-form-card {
   background: rgb(var(--surface-2));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025), var(--crm-card-shadow);
+}
+
+.crm-editor-panel > section,
+.crm-editor-panel :deep(.rounded-lg),
+.crm-playground-card,
+.crm-form-card,
+.crm-resource-card {
+  border-radius: var(--crm-panel-radius);
+}
+
+.crm-ai-page :deep(label > span:not([class*='i-lucide'])),
+.crm-ai-page :deep(.crm-field-label) {
+  color: rgb(var(--slate-10));
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.crm-ai-page :deep(input),
+.crm-ai-page :deep(textarea),
+.crm-ai-page :deep(select),
+.crm-field-control,
+.crm-price-field {
+  border-radius: 10px;
+  background: rgba(var(--background-input-box));
+}
+
+.crm-ai-page :deep(input:focus),
+.crm-ai-page :deep(textarea:focus),
+.crm-ai-page :deep(select:focus) {
+  border-color: rgb(var(--border-blue-strong));
+  background: rgb(var(--solid-2));
+  box-shadow: 0 0 0 3px rgba(255, 91, 37, 0.14);
+}
+
+.crm-ai-page :deep(button.bg-n-brand),
+.crm-ai-page :deep(button.bg-n-blue-9) {
+  min-height: 2.5rem;
+  border-radius: 0.75rem;
+  background: #ff5b25;
   box-shadow: none;
+}
+
+.crm-ai-page :deep(button.border-n-blue-8),
+.crm-ai-page :deep(.bg-n-blue-3\/40) {
+  border-color: rgb(var(--border-blue-strong));
 }
 
 .crm-field-label {
@@ -1425,14 +1589,14 @@ onMounted(loadData);
   margin-bottom: 0.375rem;
   color: rgb(var(--slate-10));
   font-size: 0.6875rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1rem;
   text-transform: uppercase;
 }
 
 .crm-field-control,
 .crm-price-field {
-  height: 2.75rem;
+  height: 2.5rem;
   width: 100%;
   border: 1px solid rgb(var(--border-weak));
   border-radius: 10px;
@@ -1453,6 +1617,7 @@ onMounted(loadData);
 .crm-price-field:focus-within {
   border-color: rgb(var(--border-blue-strong));
   background: rgb(var(--solid-2));
+  box-shadow: 0 0 0 3px rgba(255, 91, 37, 0.14);
 }
 
 .crm-price-field {
@@ -1483,10 +1648,31 @@ onMounted(loadData);
   outline: none;
 }
 
-.crm-editor-panel > section,
-.crm-editor-panel :deep(.rounded-lg),
-.crm-playground-card {
-  border-radius: var(--crm-panel-radius);
+.crm-stock-toggle,
+.crm-stock-summary {
+  display: flex;
+  height: 2.5rem;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid rgb(var(--border-weak));
+  border-radius: 10px;
+  background: rgba(var(--background-input-box));
+  color: rgb(var(--slate-11));
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.crm-stock-toggle.is-on {
+  border-color: rgb(var(--teal-7));
+  background: rgb(var(--teal-3));
+  color: rgb(var(--teal-11));
+}
+
+.crm-stock-summary {
+  background: rgb(var(--surface-2));
+  color: rgb(var(--slate-12));
 }
 
 .crm-section-tabs {
@@ -1494,17 +1680,30 @@ onMounted(loadData);
 }
 
 .crm-section-tabs button {
-  min-height: 6.5rem;
+  min-height: 6.25rem;
+  background: rgb(var(--surface-2));
+  box-shadow: var(--crm-card-shadow);
 }
 
 .crm-playground-panel {
-  background: rgb(var(--surface-1));
+  background: rgb(var(--background-color));
 }
 
 .crm-playground-card {
   position: sticky;
   top: 1rem;
-  box-shadow: 0 1px 2px rgba(14, 33, 31, 0.04);
+  background: rgb(var(--surface-2));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025), var(--crm-card-shadow);
+}
+
+.crm-ai-page :deep(table) {
+  border-collapse: collapse;
+}
+
+.crm-ai-page :deep(th),
+.crm-ai-page :deep(td) {
+  border-bottom: 1px solid rgb(var(--border-weak));
+  padding: 1rem;
 }
 
 @media (max-width: 1500px) {
