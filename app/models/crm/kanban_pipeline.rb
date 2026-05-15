@@ -5,6 +5,7 @@ class Crm::KanbanPipeline < ApplicationRecord
 
   has_many :stages, dependent: :destroy, class_name: '::Crm::KanbanStage', foreign_key: :pipeline_id, inverse_of: :pipeline
   has_many :cards, dependent: :destroy_async, class_name: '::Crm::KanbanCard', foreign_key: :pipeline_id, inverse_of: :pipeline
+  has_many :follow_up_schedules, dependent: :destroy_async, class_name: '::Crm::KanbanFollowUpSchedule', foreign_key: :pipeline_id, inverse_of: :pipeline
 
   validates :name, presence: true, uniqueness: { scope: :account_id }
 

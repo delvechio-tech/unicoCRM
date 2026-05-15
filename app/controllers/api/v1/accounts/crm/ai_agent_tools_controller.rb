@@ -77,6 +77,30 @@ class Api::V1::Accounts::Crm::AiAgentToolsController < Api::V1::Accounts::BaseCo
     render json: { result: kanban_activity_payload(activity) }, status: :created
   end
 
+  def create_kanban_follow_up
+    card = kanban_pipeline.cards.active.find(params[:card_id])
+    schedule = Crm::Kanban::FollowUps::NegotiatedScheduler.new(
+      card: card,
+      scheduled_for: kanban_follow_up_params[:scheduled_for],
+      source: kanban_follow_up_params[:source].presence || 'ai_negotiated',
+      instruction: kanban_follow_up_params[:message_instruction],
+      metadata: { 'source' => 'ai_agent' }
+    ).perform
+
+    return render json: { error: 'Follow-up nao pode ser agendado para este card.' }, status: :unprocessable_content if schedule.blank?
+
+    render json: { result: kanban_follow_up_payload(schedule) }, status: :created
+  end
+
+  def create_kanban_long_term_follow_up
+    card = kanban_pipeline.cards.active.find(params[:card_id])
+    schedule = Crm::Kanban::FollowUps::LongTermScheduler.new(card: card).perform
+
+    return render json: { error: 'Retorno longo nao pode ser agendado para este card.' }, status: :unprocessable_content if schedule.blank?
+
+    render json: { result: kanban_follow_up_payload(schedule) }, status: :created
+  end
+
   private
 
   def fetch_ai_agent
@@ -112,6 +136,10 @@ class Api::V1::Accounts::Crm::AiAgentToolsController < Api::V1::Accounts::BaseCo
 
   def kanban_activity_params
     params.require(:activity).permit(:title, :description, :activity_type, :due_at, :assignee_id, metadata: {})
+  end
+
+  def kanban_follow_up_params
+    params.require(:follow_up).permit(:scheduled_for, :source, :message_instruction)
   end
 
   def activity_metadata
@@ -151,6 +179,8 @@ class Api::V1::Accounts::Crm::AiAgentToolsController < Api::V1::Accounts::BaseCo
       stale_days: card.stale_days,
       stale_level: card.stale_level,
       next_activity_at: card.next_activity_at,
+      follow_up_intent: card.metadata.to_h['follow_up_intent'],
+      next_follow_up: kanban_follow_up_payload(next_follow_up_for(card)),
       ai_rules: kanban_pipeline.ai_rules,
       product: product_payload(card.product),
       contact: card.contact&.as_json(only: [:id, :name, :email, :phone_number]),
@@ -176,5 +206,17 @@ class Api::V1::Accounts::Crm::AiAgentToolsController < Api::V1::Accounts::BaseCo
 
   def kanban_activity_payload(activity)
     activity.as_json(only: [:id, :title, :description, :activity_type, :status, :due_at, :completed_at, :metadata])
+  end
+
+  def kanban_follow_up_payload(schedule)
+    return nil if schedule.blank?
+
+    schedule.as_json(
+      only: [:id, :source, :status, :scheduled_for, :attempt_number, :cadence_step, :channel_type, :reason, :message_instruction, :metadata]
+    )
+  end
+
+  def next_follow_up_for(card)
+    card.follow_up_schedules.scheduled.order(:scheduled_for, :id).first
   end
 end

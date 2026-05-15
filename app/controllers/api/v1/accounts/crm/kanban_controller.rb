@@ -94,7 +94,11 @@ class Api::V1::Accounts::Crm::KanbanController < Api::V1::Accounts::BaseControll
   def update_card
     card = fetch_card
     attributes = card_params.to_h
+    attributes.delete('contact_id') if card.contact_id.present?
+    attributes.delete('conversation_id') if card.conversation_id.present?
     previous_stage_id = card.stage_id
+    previous_pipeline_id = card.pipeline_id
+    previous_follow_up_mode = card.metadata.to_h.dig('follow_up_override', 'mode')
 
     if attributes['stage_id'].present? && attributes['stage_id'].to_i != card.stage_id
       stage = fetch_stage(attributes.delete('stage_id'))
@@ -105,6 +109,13 @@ class Api::V1::Accounts::Crm::KanbanController < Api::V1::Accounts::BaseControll
 
     attributes['last_activity_at'] = Time.current if card_activity_update?(attributes)
     card.update!(attributes)
+    cancel_follow_ups_for_closed_card(card) unless card.status == 'open'
+    cancel_follow_ups_for_paused_card(card)
+    cancel_follow_ups_for_removed_manual_override(card, previous_follow_up_mode)
+    Crm::Kanban::FollowUps::PipelineTransitionService.new(
+      card: card,
+      previous_pipeline_id: previous_pipeline_id
+    ).perform
     action_type = previous_stage_id == card.stage_id ? 'card.updated' : 'card.moved'
     record_action(card, action_type, data: { from_stage_id: previous_stage_id, to_stage_id: card.stage_id })
     dispatch_webhook(card, action_type, data: { from_stage_id: previous_stage_id, to_stage_id: card.stage_id })
@@ -114,9 +125,55 @@ class Api::V1::Accounts::Crm::KanbanController < Api::V1::Accounts::BaseControll
   def destroy_card
     card = fetch_card
     card.update!(status: 'archived', last_activity_at: Time.current)
+    cancel_follow_ups_for_closed_card(card)
     record_action(card, 'card.archived')
     dispatch_webhook(card, 'card.archived')
     head :ok
+  end
+
+  def summarize_card
+    card = fetch_card
+    return render_error('Vincule uma conversa salva para gerar o resumo.') if card.conversation.blank?
+
+    result = Captain::KanbanSummaryService.new(
+      account: Current.account,
+      conversation_display_id: card.conversation.display_id
+    ).perform
+
+    return render json: { error: result[:error] }, status: :unprocessable_content if result[:error]
+
+    render json: { message: result[:message] }
+  end
+
+  def create_follow_up
+    card = fetch_card
+    schedule = Crm::Kanban::FollowUps::ManualScheduler.new(
+      card: card,
+      scheduled_for: follow_up_params[:scheduled_for],
+      instruction: follow_up_params[:message_instruction]
+    ).perform
+
+    render json: follow_up_payload(schedule), status: :created
+  end
+
+  def update_follow_up
+    card = fetch_card
+    schedule = card.follow_up_schedules.find(params[:follow_up_id])
+    schedule.update!(
+      generated_message: follow_up_review_params[:generated_message],
+      metadata: schedule.metadata.to_h.merge(
+        'review_state' => follow_up_review_params[:review_state]
+      )
+    )
+
+    render json: follow_up_payload(schedule.reload)
+  end
+
+  def cancel_follow_up
+    card = fetch_card
+    schedule = card.follow_up_schedules.find(params[:follow_up_id])
+    schedule.cancel!(reason: 'review_canceled')
+    render json: follow_up_payload(schedule.reload)
   end
 
   def update_stage
@@ -265,6 +322,14 @@ class Api::V1::Accounts::Crm::KanbanController < Api::V1::Accounts::BaseControll
     params.require(:webhook).permit(:name, :url, :access_token, :active, events: [])
   end
 
+  def follow_up_params
+    params.require(:follow_up).permit(:scheduled_for, :message_instruction)
+  end
+
+  def follow_up_review_params
+    params.require(:follow_up).permit(:generated_message, :review_state)
+  end
+
   def normalize_stage_positions!
     pipeline.stages.order(:position, :id).each_with_index do |stage, index|
       stage.update_column(:position, index) if stage.position != index
@@ -362,6 +427,7 @@ class Api::V1::Accounts::Crm::KanbanController < Api::V1::Accounts::BaseControll
       product: product_payload(card.product),
       assignee: user_payload(card.assignee),
       last_message: message_payload(card.last_message),
+      next_follow_up: follow_up_payload(next_follow_up_for(card)),
       activities: card.activities.ordered.limit(20).map { |activity| activity_payload(activity) },
       actions: card.actions.order(created_at: :desc).limit(12).map { |action| action_payload(action) }
     )
@@ -545,6 +611,47 @@ class Api::V1::Accounts::Crm::KanbanController < Api::V1::Accounts::BaseControll
 
   def webhook_payload(webhook)
     webhook.as_json(only: [:id, :pipeline_id, :name, :url, :events, :active, :created_at, :updated_at])
+  end
+
+  def next_follow_up_for(card)
+    card.follow_up_schedules.scheduled.order(:scheduled_for, :id).first
+  end
+
+  def follow_up_payload(schedule)
+    return nil if schedule.blank?
+
+    schedule.as_json(
+      only: [
+        :id, :source, :status, :scheduled_for, :attempt_number, :cadence_step,
+        :channel_type, :reason, :generated_message, :metadata
+      ]
+    )
+  end
+
+  def cancel_follow_ups_for_closed_card(card)
+    Crm::Kanban::FollowUps::ScheduleCanceler.new(
+      card: card,
+      reason: "card_#{card.status}"
+    ).perform
+  end
+
+  def cancel_follow_ups_for_paused_card(card)
+    return unless card.metadata.to_h.dig('follow_up_override', 'mode') == 'paused'
+
+    Crm::Kanban::FollowUps::ScheduleCanceler.new(
+      card: card,
+      reason: 'card_follow_up_paused'
+    ).perform
+  end
+
+  def cancel_follow_ups_for_removed_manual_override(card, previous_follow_up_mode)
+    return unless previous_follow_up_mode == 'manual'
+    return unless card.metadata.to_h.dig('follow_up_override', 'mode') == 'inherit'
+
+    Crm::Kanban::FollowUps::ScheduleCanceler.new(
+      card: card,
+      reason: 'card_follow_up_manual_override_removed'
+    ).perform
   end
 
   def record_action(card, action_type, data: {})

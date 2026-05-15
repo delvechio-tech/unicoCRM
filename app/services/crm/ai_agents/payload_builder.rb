@@ -143,7 +143,9 @@ class Crm::AiAgents::PayloadBuilder
       search_faqs: tool_url('search_faqs'),
       search_kanban_cards: tool_url('search_kanban_cards'),
       update_kanban_card: tool_url('kanban_cards/{card_id}'),
-      create_kanban_activity: tool_url('kanban_cards/{card_id}/activities')
+      create_kanban_activity: tool_url('kanban_cards/{card_id}/activities'),
+      create_kanban_follow_up: tool_url('kanban_cards/{card_id}/follow_ups'),
+      create_kanban_long_term_follow_up: tool_url('kanban_cards/{card_id}/follow_ups/long_term')
     }
   end
 
@@ -171,7 +173,10 @@ class Crm::AiAgents::PayloadBuilder
       ].join(' '),
       kanban_policy: [
         'Use kanban tools when the customer shows buying intent, asks for a proposal, schedules a follow-up, wins, or refuses.',
-        'Create activities for promised calls, meetings, deadlines, proposals, and follow-ups.'
+        'Create activities for promised calls, meetings, deadlines, proposals, and follow-ups.',
+        'Inspect follow_up_intent and next_follow_up before scheduling or rescheduling a return.',
+        'Use create_kanban_follow_up when the customer agrees to a specific return date.',
+        'Use create_kanban_long_term_follow_up only for configured long-term reactivation after a soft negative has been resolved.'
       ].join(' ')
     }
   end

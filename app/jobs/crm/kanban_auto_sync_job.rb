@@ -7,6 +7,11 @@ class Crm::KanbanAutoSyncJob < ApplicationJob
               .find_by(id: message_id)
     return if message.blank?
 
-    Crm::Kanban::AutoSyncService.new(message: message).perform
+    card = Crm::Kanban::AutoSyncService.new(message: message).perform
+    return if card.blank?
+
+    Crm::Kanban::FollowUps::CancellationService.new(card: card, message: message).perform
+    Crm::Kanban::FollowUps::IncomingIntentProcessor.new(card: card, message: message).perform
+    Crm::Kanban::FollowUps::Scheduler.new(card: card, message: message).perform
   end
 end

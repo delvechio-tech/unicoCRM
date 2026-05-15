@@ -12,6 +12,7 @@ class Crm::KanbanCard < ApplicationRecord
 
   has_many :actions, dependent: :destroy_async, class_name: '::Crm::KanbanAction', foreign_key: :card_id, inverse_of: :card
   has_many :activities, dependent: :destroy_async, class_name: '::Crm::KanbanActivity', foreign_key: :card_id, inverse_of: :card
+  has_many :follow_up_schedules, dependent: :destroy_async, class_name: '::Crm::KanbanFollowUpSchedule', foreign_key: :card_id, inverse_of: :card
 
   validates :title, presence: true
   validates :budget_currency, presence: true

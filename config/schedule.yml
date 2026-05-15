@@ -20,6 +20,12 @@ trigger_imap_email_inboxes_job:
   class: 'Inboxes::FetchImapEmailInboxesJob'
   queue: scheduled_jobs
 
+# executed every minute to dispatch due CRM Kanban follow-ups that already have approved content
+crm_kanban_follow_up_dispatch_job:
+  cron: '*/1 * * * *'
+  class: 'Crm::KanbanFollowUpDispatchJob'
+  queue: scheduled_jobs
+
 # executed daily at 2230 UTC
 # which is our lowest traffic time
 remove_stale_contact_inboxes_job.rb:

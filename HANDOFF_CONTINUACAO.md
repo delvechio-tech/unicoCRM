@@ -359,6 +359,25 @@ Estado atual deste chat:
     - `chatwoot_chatwoot_app` e `chatwoot_chatwoot_sidekiq` ficaram com update `completed` usando o digest novo;
     - `https://chat.unicocrm.com/` respondeu HTTP `200 OK`;
     - `https://chat.unicocrm.com/health` respondeu HTTP `200 OK` com `{"status":"woot"}`.
+- Rodada de follow-up nativo em 2026-05-15:
+  - `IncomingIntentProcessor` passou a tratar mensagens incoming de follow-up;
+  - opt-out explicito desqualifica o card, cancela agendas pendentes e grava `follow_up_intent.opted_out`;
+  - negativas brandas gravam `follow_up_intent.awaiting_reschedule_preference`, preservando a diferenca entre remarcar e nao contatar mais;
+  - board e painel do card passaram a exibir esses estados de forma compacta;
+  - impacto Chat 01: o sync incoming agora tambem classifica intencao de follow-up, sem mudanca em Quepasa, provider ou parsing de webhook;
+  - `NegotiatedScheduler` e `LongTermScheduler` foram adicionados para agendar retorno combinado e reativacao longa com regras do funil;
+  - tools de IA novas: `create_kanban_follow_up` e `create_kanban_long_term_follow_up`;
+  - a busca de cards para IA agora devolve `follow_up_intent` e `next_follow_up`, evitando reagendamento cego;
+  - impacto Chat 02: payload n8n passou a divulgar as novas tools e instrui a IA a usa-las apenas quando houver data combinada ou retorno longo configurado.
+  - execucao nativa ganhou `Crm::KanbanFollowUpDispatchJob`, `Crm::KanbanFollowUpExecutionJob` e `ExecutionService`;
+  - o dispatcher roda a cada minuto via `config/schedule.yml`; agendas vencidas sem texto final passam antes por `Crm::KanbanFollowUpGenerationJob`;
+  - `GenerationService` usa `Captain::KanbanFollowUpMessageService` com prompt proprio em portugues para gravar `generated_message`;
+  - antes de enviar, a execucao revalida opt-out, card aberto e resposta posterior do cliente; depois cria message outgoing e chama `SendReplyJob`;
+  - decisao de produto: sem mensagem final gerada/revisada, a agenda permanece pendente e nao dispara texto cru para o cliente.
+  - cada funil agora define `delivery_mode` (`automatic` ou `review_before_send`);
+  - no modo de revisao, mensagens geradas ficam com `review_state: pending_review`, nao sao despachadas e podem ser editadas/aprovadas/canceladas no painel do card.
+  - `CadenceAdvancer` passou a abrir o proximo passo apos cada follow-up enviado, respeitando `max_attempts`;
+  - quando a cadencia se esgota, o sistema registra `cadence_exhausted` ou agenda retorno longo se essa opcao estiver habilitada no funil.
 
 Arquivos sensiveis deste chat:
 
@@ -929,6 +948,95 @@ Pendencias:
   - Portainer atualizou `chatwoot_chatwoot_app` e `chatwoot_chatwoot_sidekiq` com update `completed`;
   - `/health` respondeu HTTP 200 com `{"status":"woot"}`.
 
+### Incremento Kanban - resumo comercial e vinculos imutaveis 2026-05-15
+
+- Frente 04 iniciou a fase 1 do novo plano de follow-up sem ainda implementar o motor de cadencia.
+- `Metricas` saiu da toolbar principal e fica apenas no menu do funil.
+- `Contato ID` e `Conversa ID` viraram vinculos imutaveis apos serem definidos:
+  - readonly no painel do card;
+  - update backend descarta tentativa de troca quando o card ja possui vinculo.
+- Foi criado um resumo proprio do Kanban:
+  - endpoint dedicado por card;
+  - servico `Captain::KanbanSummaryService`;
+  - prompt dedicado `kanban_summary` em portugues, 30 a 60 palavras, sem titulos.
+- Impacto Chat 02: novo contrato de IA restrito ao Kanban.
+- Sem impacto novo em Chat 01, Chat 03 ou Chat 05.
+
+### Incremento Kanban - configuracao de follow-up 2026-05-15
+
+- Frente 04 implementou a fase 2 do plano de follow-up: configuracao persistida por pipeline, ainda sem execucao automatica.
+- `Regras` agora possui um bloco de `Follow-up automatico` com:
+  - ativacao;
+  - instrucao livre;
+  - cadencia;
+  - limite de tentativas;
+  - reagendamento inteligente;
+  - retorno longo;
+  - horario comercial;
+  - excecoes por canal.
+- Persistencia feita em `pipeline.settings.follow_up_settings`, separando configuracao da futura modelagem de execucao/historico.
+- Sem impacto novo em Chat 01, Chat 02 ou Chat 05.
+- Impacto Chat 03: ajuste visual/UX localizado na aba `Regras`.
+
+### Decisao de produto/arquitetura 2026-05-15
+
+- Thiago confirmou a separacao em tres camadas:
+  - `Core`;
+  - `Intelligence`;
+  - `Agent`.
+- Follow-up inteligente sera feature da camada `Intelligence`, disponivel mesmo quando a conversa for humana e sem depender do agente autonomo premium.
+- Direcao tecnica acordada para a fase 3:
+  - Rails/Kanban e dono do estado e regras do follow-up;
+  - IA externa/servico dedicado pode gerar/classificar, mas nao guardar a verdade do fluxo;
+  - n8n permanece como integracao/orquestracao e executor do agente premium no curto prazo, nao como dono do motor nativo de follow-up.
+- Esta decisao impacta o desenho futuro da frente 02, mas ainda nao houve mudanca de payload/tool nesta rodada.
+
+### Incremento Kanban - base operacional de follow-up 2026-05-15
+
+- Frente 04 abriu a fase 3 com modelagem propria de follow-up:
+  - schedules;
+  - events;
+  - servico de agendamento;
+  - servico de cancelamento.
+- `KanbanAutoSyncJob` agora usa o card retornado pelo sync para:
+  - agendar primeiro follow-up de pipelines ativos em mensagens `outgoing`;
+  - cancelar schedules pendentes em mensagens `incoming`.
+- Ainda nao ha sweep job nem envio automatico; esta rodada entregou somente estado/auditoria/cancelamento.
+- Validacoes:
+  - migration de teste executada;
+  - specs de listener, auto-sync, scheduler e cancellation passaram com 10 exemplos e 0 falhas.
+- Impacto Chat 01: o fluxo de mensagem continua sem mudanca em Quepasa, mas o job de sync do Kanban passou a produzir efeitos adicionais de follow-up.
+- Sem impacto novo em Chat 02, Chat 03 ou Chat 05.
+
+### Incremento Kanban - visibilidade e override local do follow-up 2026-05-15
+
+- Payload de card agora inclui `next_follow_up`.
+- Board e detalhe do card exibem o próximo contato automático quando houver schedule ativo.
+- Novos serviços:
+  - `ScheduleCanceler`;
+  - `PipelineTransitionService`.
+- Schedules pendentes passam a ser cancelados em:
+  - resposta do cliente;
+  - nova mensagem outgoing;
+  - mudança de pipeline;
+  - fechamento/arquivamento do card;
+  - override local `paused`.
+- O card agora permite escolher entre herdar a regra do funil ou pausar o follow-up naquele caso.
+- Foi adicionado follow-up especifico por card:
+  - endpoint dedicado;
+  - schedule `manual_override`;
+  - data/hora + instrucao livre no painel lateral;
+  - substituicao da agenda geral pendente.
+- O `Scheduler` agora usa:
+  - `channel_overrides` no primeiro timing;
+  - `business_hours_*` para empurrar a agenda ate a proxima janela comercial valida.
+- Ainda faltam:
+  - motor de execução/envio;
+  - classificação inteligente de negativa/opt-out;
+  - retorno longo automatizado.
+- Impacto Chat 01: transições de pipeline vindas do sync passam a cancelar follow-ups pendentes.
+- Impacto Chat 03: houve ajuste visual localizado no card e no painel lateral.
+
 ## Prompt base para criar outros chats
 
 Ao criar os outros 3 chats, use este modelo e troque o nome/responsabilidade:
@@ -958,3 +1066,16 @@ Regras:
 
 Ao final da sua etapa, atualize MEMORIA_PROJETO.md e HANDOFF_CONTINUACAO.md com um handoff completo para eu voltar ao chat original.
 ```
+
+### Ajuste Kanban - usabilidade e consistencia do follow-up 2026-05-15
+
+- Corrigido o scroll vertical das abas administrativas do Kanban.
+- Corrigido o envio de datas de atividade/follow-up manual: a UI converte `datetime-local` para ISO/UTC antes de chamar a API.
+- Adicionado cancelamento direto para qualquer `next_follow_up` pendente no painel lateral do card.
+- A configuracao de etapas saiu do layout de tabela comprimida para cards por etapa com campos explicitamente rotulados.
+- Menus de funil, etapa e card foram padronizados no mesmo alinhamento visual.
+- Leitura atual do produto:
+  - `automation_rules` sao regras executaveis do auto-sync;
+  - `ai_rules` continuam sendo orientacao textual para IA/ferramentas, nao logica executavel por si so;
+  - metricas atuais cobrem cards, parados, orcamento aberto, agenda, atrasos e SLA, mas ainda nao medem desempenho de follow-up.
+- Impacto Chat 03: refinamento visual localizado no Kanban.

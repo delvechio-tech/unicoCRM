@@ -36,6 +36,22 @@ class CrmKanbanAPI extends ApiClient {
     return axios.delete(`${this.url}/cards/${id}`, { params });
   }
 
+  summarizeCard(id, params = {}) {
+    return axios.post(`${this.url}/cards/${id}/summarize`, null, { params });
+  }
+
+  createFollowUp(cardId, data) {
+    return axios.post(`${this.url}/cards/${cardId}/follow_ups`, data);
+  }
+
+  updateFollowUp(cardId, followUpId, data) {
+    return axios.patch(`${this.url}/cards/${cardId}/follow_ups/${followUpId}`, data);
+  }
+
+  cancelFollowUp(cardId, followUpId, params = {}) {
+    return axios.delete(`${this.url}/cards/${cardId}/follow_ups/${followUpId}`, { params });
+  }
+
   updateStage(id, data) {
     return axios.patch(`${this.url}/stages/${id}`, data);
   }

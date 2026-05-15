@@ -92,6 +92,10 @@ Rails.application.routes.draw do
               post 'cards', to: 'kanban#create_card'
               patch 'cards/:card_id', to: 'kanban#update_card'
               delete 'cards/:card_id', to: 'kanban#destroy_card'
+              post 'cards/:card_id/summarize', to: 'kanban#summarize_card'
+              post 'cards/:card_id/follow_ups', to: 'kanban#create_follow_up'
+              patch 'cards/:card_id/follow_ups/:follow_up_id', to: 'kanban#update_follow_up'
+              delete 'cards/:card_id/follow_ups/:follow_up_id', to: 'kanban#cancel_follow_up'
               post 'cards/:card_id/activities', to: 'kanban#create_activity'
               patch 'cards/:card_id/activities/:activity_id', to: 'kanban#update_activity'
               post 'cards/:card_id/activities/:activity_id/complete', to: 'kanban#complete_activity'
@@ -110,6 +114,8 @@ Rails.application.routes.draw do
               get 'tools/search_kanban_cards', to: 'ai_agent_tools#search_kanban_cards'
               patch 'tools/kanban_cards/:card_id', to: 'ai_agent_tools#update_kanban_card'
               post 'tools/kanban_cards/:card_id/activities', to: 'ai_agent_tools#create_kanban_activity'
+              post 'tools/kanban_cards/:card_id/follow_ups', to: 'ai_agent_tools#create_kanban_follow_up'
+              post 'tools/kanban_cards/:card_id/follow_ups/long_term', to: 'ai_agent_tools#create_kanban_long_term_follow_up'
             end
             resources :products, only: [:index, :show, :create, :update, :destroy]
           end

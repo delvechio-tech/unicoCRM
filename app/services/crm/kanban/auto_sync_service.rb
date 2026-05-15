@@ -73,6 +73,7 @@ class Crm::Kanban::AutoSyncService
   end
 
   def update_card_from_message(card, sync_target, sync_metadata)
+    previous_pipeline_id = card.pipeline_id
     attributes = {
       contact: contact,
       conversation: conversation,
@@ -90,6 +91,10 @@ class Crm::Kanban::AutoSyncService
     end
 
     card.update!(attributes)
+    Crm::Kanban::FollowUps::PipelineTransitionService.new(
+      card: card,
+      previous_pipeline_id: previous_pipeline_id
+    ).perform
   end
 
   def sync_metadata_for_create(sync_target)

@@ -7,7 +7,6 @@ import { conversationUrl, frontendURL } from 'dashboard/helper/URLHelper';
 import kanbanAPI from 'dashboard/api/crm/kanban';
 import productsAPI from 'dashboard/api/crm/products';
 import contactsAPI from 'dashboard/api/contacts';
-import captainTasksAPI from 'dashboard/api/captain/tasks';
 
 const route = useRoute();
 
@@ -32,6 +31,8 @@ const openCardMenuId = ref(null);
 const isSearchingContacts = ref(false);
 const isSummarizing = ref(false);
 const isSavingActivity = ref(false);
+const isSavingManualFollowUp = ref(false);
+const isSavingFollowUpReview = ref(false);
 const boardSearch = ref('');
 const boardFilter = ref('all');
 const activeConfigTab = ref('board');
@@ -47,6 +48,7 @@ const cardForm = reactive({
   summary: '',
   notes: '',
   status: 'open',
+  follow_up_mode: 'inherit',
 });
 
 const rulesForm = reactive({
@@ -59,6 +61,27 @@ const automationRuleForm = reactive({
   trigger: 'message_created',
   condition: 'incoming_message',
   stage_id: '',
+});
+
+const followUpForm = reactive({
+  enabled: false,
+  delivery_mode: 'automatic',
+  instruction: '',
+  max_attempts: 3,
+  reschedule_enabled: true,
+  reschedule_interval_value: 1,
+  reschedule_interval_unit: 'day',
+  max_date_suggestions: 2,
+  long_term_enabled: true,
+  long_term_delay_value: 3,
+  long_term_delay_unit: 'month',
+  opt_out_disqualifies: true,
+  business_hours_enabled: true,
+  business_days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+  business_start: '08:00',
+  business_end: '18:00',
+  cadence: [],
+  channel_overrides: [],
 });
 
 const pipelineForm = reactive({
@@ -104,6 +127,33 @@ const stageColors = [
   { value: 'slate', label: 'Neutro' },
 ];
 
+const durationUnits = [
+  { value: 'minute', label: 'Minutos' },
+  { value: 'hour', label: 'Horas' },
+  { value: 'day', label: 'Dias' },
+  { value: 'week', label: 'Semanas' },
+  { value: 'month', label: 'Meses' },
+];
+
+const weekdayOptions = [
+  { value: 'mon', label: 'Seg' },
+  { value: 'tue', label: 'Ter' },
+  { value: 'wed', label: 'Qua' },
+  { value: 'thu', label: 'Qui' },
+  { value: 'fri', label: 'Sex' },
+  { value: 'sat', label: 'Sab' },
+  { value: 'sun', label: 'Dom' },
+];
+
+const channelOptions = [
+  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'facebook', label: 'Facebook' },
+  { value: 'telegram', label: 'Telegram' },
+  { value: 'email', label: 'Email' },
+  { value: 'web_widget', label: 'Web widget' },
+];
+
 const stageForm = reactive({
   name: '',
   stale_after_days: 2,
@@ -118,6 +168,15 @@ const activityForm = reactive({
   description: '',
 });
 
+const manualFollowUpForm = reactive({
+  scheduled_for: '',
+  message_instruction: '',
+});
+
+const followUpReviewForm = reactive({
+  generated_message: '',
+});
+
 const webhookForm = reactive({
   name: '',
   url: '',
@@ -125,17 +184,89 @@ const webhookForm = reactive({
   events: '',
 });
 
+const localDateTimeToIso = value => {
+  if (!value) return null;
+
+  return new Date(value).toISOString();
+};
+
 const selectedCard = computed(() =>
   cards.value.find(card => card.id === selectedCardId.value)
 );
+const isContactLocked = computed(() => Boolean(selectedCard.value?.contact_id));
+const isConversationLocked = computed(() => Boolean(selectedCard.value?.conversation_id));
 
 const pipelineSettings = computed(() => pipeline.value?.settings || {});
+
+const followUpIntentLabel = card => {
+  const state = card?.metadata?.follow_up_intent?.state;
+
+  if (state === 'awaiting_reschedule_preference') return 'Aguardando nova data';
+  if (state === 'opted_out') return 'Nao contatar';
+
+  return '';
+};
+
+const followUpIntentDescription = card => {
+  const state = card?.metadata?.follow_up_intent?.state;
+
+  if (state === 'awaiting_reschedule_preference') {
+    return 'Cliente sinalizou que nao pode falar agora. A proxima acao deve pedir ou sugerir nova data.';
+  }
+
+  if (state === 'opted_out') {
+    return 'Cliente pediu para nao receber novos contatos. Follow-ups ficam bloqueados.';
+  }
+
+  return '';
+};
 
 const automationRules = computed(() =>
   Array.isArray(pipelineSettings.value.automation_rules)
     ? pipelineSettings.value.automation_rules
     : []
 );
+
+const defaultFollowUpSettings = () => ({
+  enabled: false,
+  delivery_mode: 'automatic',
+  instruction: '',
+  trigger: 'last_ai_message_without_customer_reply',
+  max_attempts: 3,
+  reschedule_enabled: true,
+  reschedule_interval_value: 1,
+  reschedule_interval_unit: 'day',
+  max_date_suggestions: 2,
+  long_term_enabled: true,
+  long_term_delay_value: 3,
+  long_term_delay_unit: 'month',
+  opt_out_disqualifies: true,
+  business_hours_enabled: true,
+  business_days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+  business_start: '08:00',
+  business_end: '18:00',
+  cadence: [
+    { id: 'step-1', delay_value: 2, delay_unit: 'hour' },
+    { id: 'step-2', delay_value: 1, delay_unit: 'day' },
+  ],
+  channel_overrides: [],
+});
+
+const applyFollowUpSettings = settings => {
+  const merged = {
+    ...defaultFollowUpSettings(),
+    ...(settings || {}),
+  };
+
+  Object.assign(followUpForm, {
+    ...merged,
+    cadence: Array.isArray(merged.cadence) ? merged.cadence.map(step => ({ ...step })) : [],
+    channel_overrides: Array.isArray(merged.channel_overrides)
+      ? merged.channel_overrides.map(rule => ({ ...rule }))
+      : [],
+    business_days: Array.isArray(merged.business_days) ? [...merged.business_days] : [],
+  });
+};
 
 const filteredCards = computed(() => {
   const searchTerm = boardSearch.value.trim().toLowerCase();
@@ -199,6 +330,7 @@ const updateBoardState = data => {
   metrics.value = data.metrics || {};
   webhooks.value = data.webhooks || [];
   rulesForm.ai_rules = pipeline.value?.ai_rules || '';
+  applyFollowUpSettings(pipeline.value?.settings?.follow_up_settings);
 };
 
 const updatePipelineSettings = async nextSettings => {
@@ -223,6 +355,75 @@ const resetAutomationRuleForm = () => {
   });
 };
 
+const addCadenceStep = () => {
+  followUpForm.cadence.push({
+    id: `step-${Date.now()}`,
+    delay_value: 1,
+    delay_unit: 'day',
+  });
+};
+
+const removeCadenceStep = step => {
+  followUpForm.cadence = followUpForm.cadence.filter(item => item.id !== step.id);
+};
+
+const addChannelOverride = () => {
+  followUpForm.channel_overrides.push({
+    id: `channel-${Date.now()}`,
+    channel: '',
+    delay_value: 23,
+    delay_unit: 'hour',
+    max_attempts: 1,
+  });
+};
+
+const removeChannelOverride = rule => {
+  followUpForm.channel_overrides = followUpForm.channel_overrides.filter(item => item.id !== rule.id);
+};
+
+const saveFollowUpSettings = async () => {
+  try {
+    await updatePipelineSettings({
+      follow_up_settings: {
+        enabled: followUpForm.enabled,
+        delivery_mode: followUpForm.delivery_mode,
+        instruction: followUpForm.instruction,
+        trigger: 'last_ai_message_without_customer_reply',
+        max_attempts: Number(followUpForm.max_attempts),
+        reschedule_enabled: followUpForm.reschedule_enabled,
+        reschedule_interval_value: Number(followUpForm.reschedule_interval_value),
+        reschedule_interval_unit: followUpForm.reschedule_interval_unit,
+        max_date_suggestions: Number(followUpForm.max_date_suggestions),
+        long_term_enabled: followUpForm.long_term_enabled,
+        long_term_delay_value: Number(followUpForm.long_term_delay_value),
+        long_term_delay_unit: followUpForm.long_term_delay_unit,
+        opt_out_disqualifies: followUpForm.opt_out_disqualifies,
+        business_hours_enabled: followUpForm.business_hours_enabled,
+        business_days: [...followUpForm.business_days],
+        business_start: followUpForm.business_start,
+        business_end: followUpForm.business_end,
+        cadence: followUpForm.cadence.map(step => ({
+          id: step.id,
+          delay_value: Number(step.delay_value),
+          delay_unit: step.delay_unit,
+        })),
+        channel_overrides: followUpForm.channel_overrides
+          .filter(rule => rule.channel)
+          .map(rule => ({
+            id: rule.id,
+            channel: rule.channel,
+            delay_value: Number(rule.delay_value),
+            delay_unit: rule.delay_unit,
+            max_attempts: Number(rule.max_attempts),
+          })),
+      },
+    });
+    useAlert('Configuracao de follow-up salva.');
+  } catch (error) {
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel salvar o follow-up.');
+  }
+};
+
 const resetCardForm = (stageId, shouldOpen = true) => {
   selectedCardId.value = null;
   isDetailOpen.value = shouldOpen;
@@ -237,6 +438,7 @@ const resetCardForm = (stageId, shouldOpen = true) => {
     summary: '',
     notes: '',
     status: 'open',
+    follow_up_mode: 'inherit',
   });
 };
 
@@ -417,6 +619,17 @@ const selectContact = contact => {
   contactResults.value = [];
 };
 
+const resetManualFollowUpForm = () => {
+  Object.assign(manualFollowUpForm, {
+    scheduled_for: '',
+    message_instruction: '',
+  });
+};
+
+const syncFollowUpReviewForm = card => {
+  followUpReviewForm.generated_message = card?.next_follow_up?.generated_message || '';
+};
+
 const editCard = card => {
   selectedCardId.value = card.id;
   isDetailOpen.value = true;
@@ -431,7 +644,10 @@ const editCard = card => {
     summary: card.summary || '',
     notes: card.notes || '',
     status: card.status || 'open',
+    follow_up_mode: card.metadata?.follow_up_override?.mode || 'inherit',
   });
+  resetManualFollowUpForm();
+  syncFollowUpReviewForm(card);
 };
 
 const resetActivityForm = () => {
@@ -451,6 +667,13 @@ const compactCardPayload = () => ({
     conversation_id: cardForm.conversation_id || null,
     product_id: cardForm.product_id || null,
     budget_amount: cardForm.budget_amount || null,
+    metadata: {
+      ...(selectedCard.value?.metadata || {}),
+      follow_up_override: {
+        ...(selectedCard.value?.metadata?.follow_up_override || {}),
+        mode: cardForm.follow_up_mode,
+      },
+    },
   },
 });
 
@@ -471,21 +694,83 @@ const saveCard = async () => {
 };
 
 const summarizeConversation = async () => {
-  const conversationDisplayId = selectedCard.value?.conversation?.display_id;
-  if (!conversationDisplayId) {
+  if (!selectedCard.value?.conversation?.display_id) {
     useAlert('Vincule uma conversa salva para gerar o resumo.');
     return;
   }
 
   isSummarizing.value = true;
   try {
-    const response = await captainTasksAPI.summarize(conversationDisplayId);
+    const response = await kanbanAPI.summarizeCard(selectedCard.value.id, {
+      pipeline_id: selectedPipelineId.value,
+    });
     cardForm.summary = response.data.message || cardForm.summary;
     useAlert('Resumo gerado.');
   } catch (error) {
     useAlert(error.message || 'Nao foi possivel gerar o resumo.');
   } finally {
     isSummarizing.value = false;
+  }
+};
+
+const createManualFollowUp = async () => {
+  if (!selectedCard.value || !manualFollowUpForm.scheduled_for) return;
+
+  isSavingManualFollowUp.value = true;
+  try {
+    await kanbanAPI.createFollowUp(selectedCard.value.id, {
+      pipeline_id: selectedPipelineId.value,
+      follow_up: {
+        ...manualFollowUpForm,
+        scheduled_for: localDateTimeToIso(manualFollowUpForm.scheduled_for),
+      },
+    });
+    useAlert('Follow-up especifico agendado.');
+    await reloadCurrentBoard();
+    cardForm.follow_up_mode = 'manual';
+    resetManualFollowUpForm();
+  } catch (error) {
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel agendar o follow-up.');
+  } finally {
+    isSavingManualFollowUp.value = false;
+  }
+};
+
+const approveFollowUp = async () => {
+  if (!selectedCard.value?.next_follow_up) return;
+
+  isSavingFollowUpReview.value = true;
+  try {
+    await kanbanAPI.updateFollowUp(selectedCard.value.id, selectedCard.value.next_follow_up.id, {
+      pipeline_id: selectedPipelineId.value,
+      follow_up: {
+        generated_message: followUpReviewForm.generated_message,
+        review_state: 'approved',
+      },
+    });
+    useAlert('Follow-up aprovado.');
+    await reloadCurrentBoard();
+  } catch (error) {
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel aprovar o follow-up.');
+  } finally {
+    isSavingFollowUpReview.value = false;
+  }
+};
+
+const cancelPendingFollowUp = async () => {
+  if (!selectedCard.value?.next_follow_up) return;
+
+  isSavingFollowUpReview.value = true;
+  try {
+    await kanbanAPI.cancelFollowUp(selectedCard.value.id, selectedCard.value.next_follow_up.id, {
+      pipeline_id: selectedPipelineId.value,
+    });
+    useAlert('Follow-up cancelado.');
+    await reloadCurrentBoard();
+  } catch (error) {
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel cancelar o follow-up.');
+  } finally {
+    isSavingFollowUpReview.value = false;
   }
 };
 
@@ -616,7 +901,7 @@ const createActivity = async () => {
       pipeline_id: selectedPipelineId.value,
       activity: {
         ...activityForm,
-        due_at: activityForm.due_at || null,
+        due_at: localDateTimeToIso(activityForm.due_at),
       },
     });
     useAlert('Atividade criada.');
@@ -836,7 +1121,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="crm-kanban-page flex h-full min-h-0 flex-1 flex-col bg-n-background">
+  <main
+    class="crm-kanban-page flex h-full min-h-0 flex-1 flex-col bg-n-background"
+    :class="activeConfigTab === 'board' ? 'overflow-hidden' : 'overflow-y-auto'"
+  >
     <header class="crm-page-header border-b border-n-weak px-6 py-4">
       <div class="crm-title-row flex flex-wrap items-center gap-3">
         <label class="crm-pipeline-title-select min-w-[220px]">
@@ -869,15 +1157,6 @@ onBeforeUnmount(() => {
           </select>
         </div>
         <div class="crm-header-actions ml-auto flex flex-wrap items-center gap-2">
-          <button
-            class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12"
-            :class="{ 'bg-n-alpha-2 text-n-blue-11': activeConfigTab === 'metrics' }"
-            type="button"
-            @click="openConfigTab(activeConfigTab === 'metrics' ? 'board' : 'metrics')"
-          >
-            <span class="i-lucide-bar-chart-3 size-4" />
-            Metricas · {{ metrics.total_cards || 0 }} ativos
-          </button>
           <div class="relative" v-on-clickaway="() => (isPipelineMenuOpen = false)">
             <button
               class="inline-flex size-10 items-center justify-center rounded-md border border-n-weak text-n-slate-12 hover:bg-n-alpha-2"
@@ -890,7 +1169,7 @@ onBeforeUnmount(() => {
             </button>
             <div
               v-if="isPipelineMenuOpen"
-              class="absolute right-0 z-30 mt-2 w-56 overflow-hidden rounded-md border border-n-weak bg-n-solid-1 py-1 shadow-lg"
+              class="crm-popover-menu absolute right-0 z-30 mt-2 w-56 overflow-hidden rounded-md border border-n-weak bg-n-solid-1 py-1 shadow-lg"
             >
               <button class="crm-menu-item" type="button" @click="runPipelineMenuAction(() => openPipelineForm(pipeline))">
                 <span class="i-lucide-settings-2 size-4" />
@@ -1042,47 +1321,46 @@ onBeforeUnmount(() => {
           </div>
         </form>
 
-        <div v-if="stages.length" class="crm-stage-table mt-4 overflow-hidden rounded-md border border-n-weak">
-          <div class="crm-stage-table-head grid gap-2 px-3 py-2 text-xs font-semibold uppercase text-n-slate-10 md:grid-cols-[minmax(220px,1fr)_140px_110px_110px_88px]">
-            <span>Etapa</span>
-            <span>Cor</span>
-            <span>Parado</span>
-            <span>Chance</span>
-            <span class="text-right">Acoes</span>
-          </div>
+        <div v-if="stages.length" class="crm-stage-config-list mt-4 space-y-3">
           <article
             v-for="stage in stages"
             :key="`stage-config-${stage.id}`"
-            class="crm-stage-config-row grid gap-2 border-t border-n-weak px-3 py-2 md:grid-cols-[minmax(220px,1fr)_140px_110px_110px_88px]"
+            class="crm-stage-config-card rounded-md border border-n-weak bg-n-alpha-1 p-3"
           >
-            <label>
-              <span class="sr-only">Etapa</span>
-              <input v-model="stage.name" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" @change="updateStage(stage)" />
-            </label>
-            <label>
-              <span class="sr-only">Cor</span>
-              <select v-model="stage.color" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" @change="updateStage(stage)">
-                <option v-for="color in stageColors" :key="color.value" :value="color.value">{{ color.label }}</option>
-              </select>
-            </label>
-            <label>
-              <span class="sr-only">Parado apos</span>
-              <div class="crm-stage-number">
-                <input v-model="stage.stale_after_days" type="number" min="0" @change="updateStage(stage)" />
-                <b>d</b>
+            <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
+              <div class="flex min-w-0 items-center gap-2">
+                <span class="crm-stage-config-dot" :class="`accent-${stage.color}`" />
+                <strong class="truncate text-sm text-n-slate-12">{{ stage.name || 'Etapa sem nome' }}</strong>
               </div>
-            </label>
-            <label>
-              <span class="sr-only">Chance</span>
-              <div class="crm-stage-number">
-                <input v-model="stage.win_probability" type="number" min="0" max="100" @change="updateStage(stage)" />
-                <b>%</b>
-              </div>
-            </label>
-            <div class="flex items-center justify-end">
               <button class="rounded-md px-2 py-2 text-sm text-n-ruby-10 hover:bg-n-ruby-3" type="button" @click="deleteStage(stage)">
                 Excluir
               </button>
+            </div>
+            <div class="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_180px_160px_160px]">
+              <label>
+                <span class="mb-1 block text-xs font-semibold uppercase text-n-slate-10">Nome</span>
+                <input v-model="stage.name" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" @change="updateStage(stage)" />
+              </label>
+              <label>
+                <span class="mb-1 block text-xs font-semibold uppercase text-n-slate-10">Cor</span>
+                <select v-model="stage.color" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" @change="updateStage(stage)">
+                  <option v-for="color in stageColors" :key="color.value" :value="color.value">{{ color.label }}</option>
+                </select>
+              </label>
+              <label>
+                <span class="mb-1 block text-xs font-semibold uppercase text-n-slate-10">Parado apos</span>
+                <div class="crm-stage-number">
+                  <input v-model="stage.stale_after_days" type="number" min="0" @change="updateStage(stage)" />
+                  <b>d</b>
+                </div>
+              </label>
+              <label>
+                <span class="mb-1 block text-xs font-semibold uppercase text-n-slate-10">Chance</span>
+                <div class="crm-stage-number">
+                  <input v-model="stage.win_probability" type="number" min="0" max="100" @change="updateStage(stage)" />
+                  <b>%</b>
+                </div>
+              </label>
             </div>
           </article>
         </div>
@@ -1215,6 +1493,175 @@ onBeforeUnmount(() => {
             Salvar orientacao
           </button>
         </form>
+
+        <form class="mt-6 border-t border-n-weak pt-5" @submit.prevent="saveFollowUpSettings">
+          <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 class="text-sm font-semibold text-n-slate-12">Follow-up automatico</h3>
+              <p class="mt-1 text-xs text-n-slate-11">
+                Defina como este funil retoma conversas sem resposta do cliente.
+              </p>
+            </div>
+            <label class="inline-flex items-center gap-2 text-sm font-medium text-n-slate-12">
+              <input v-model="followUpForm.enabled" type="checkbox" />
+              Ativar neste funil
+            </label>
+          </div>
+
+          <div class="grid gap-4 xl:grid-cols-[minmax(320px,1.2fr)_minmax(280px,1fr)]">
+            <div class="space-y-4">
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-n-slate-12">Instrucao livre para a IA</span>
+                <textarea
+                  v-model="followUpForm.instruction"
+                  rows="4"
+                  class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12"
+                  placeholder="Ex: Seja consultiva, curta e contextual. Retome o assunto anterior sem soar insistente."
+                />
+              </label>
+
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-n-slate-12">Modo de envio</span>
+                <select v-model="followUpForm.delivery_mode" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12">
+                  <option value="automatic">Automatico</option>
+                  <option value="review_before_send">Revisar antes de enviar</option>
+                </select>
+              </label>
+
+              <div class="rounded-md border border-n-weak bg-n-alpha-1 p-3">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <h4 class="text-sm font-semibold text-n-slate-12">Cadencia</h4>
+                    <p class="text-xs text-n-slate-11">Gatilho: ultima mensagem da IA sem resposta do cliente.</p>
+                  </div>
+                  <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12 hover:bg-n-alpha-2" type="button" @click="addCadenceStep">
+                    <span class="i-lucide-plus size-4" />
+                    Passo
+                  </button>
+                </div>
+                <div class="space-y-2">
+                  <div
+                    v-for="(step, index) in followUpForm.cadence"
+                    :key="step.id"
+                    class="grid gap-2 md:grid-cols-[90px_1fr_1fr_auto]"
+                  >
+                    <span class="flex items-center text-sm text-n-slate-11">{{ index + 1 }} tentativa</span>
+                    <input v-model="step.delay_value" type="number" min="1" class="crm-control rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
+                    <select v-model="step.delay_unit" class="crm-control rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12">
+                      <option v-for="unit in durationUnits" :key="unit.value" :value="unit.value">{{ unit.label }}</option>
+                    </select>
+                    <button class="text-sm text-n-ruby-10 hover:text-n-ruby-11" type="button" @click="removeCadenceStep(step)">Remover</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid gap-3 md:grid-cols-2">
+                <label>
+                  <span class="mb-1 block text-xs font-semibold uppercase text-n-slate-10">Limite de tentativas</span>
+                  <input v-model="followUpForm.max_attempts" type="number" min="0" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
+                </label>
+                <label>
+                  <span class="mb-1 block text-xs font-semibold uppercase text-n-slate-10">Datas sugeridas</span>
+                  <input v-model="followUpForm.max_date_suggestions" type="number" min="0" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
+                </label>
+              </div>
+            </div>
+
+            <div class="space-y-4">
+              <div class="rounded-md border border-n-weak bg-n-alpha-1 p-3">
+                <h4 class="text-sm font-semibold text-n-slate-12">Reagendamento inteligente</h4>
+                <label class="mt-3 inline-flex items-center gap-2 text-sm text-n-slate-12">
+                  <input v-model="followUpForm.reschedule_enabled" type="checkbox" />
+                  Tentar reagendar negativas nao definitivas
+                </label>
+                <div class="mt-3 grid gap-2 md:grid-cols-2">
+                  <input v-model="followUpForm.reschedule_interval_value" type="number" min="1" class="crm-control rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
+                  <select v-model="followUpForm.reschedule_interval_unit" class="crm-control rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12">
+                    <option v-for="unit in durationUnits" :key="unit.value" :value="unit.value">{{ unit.label }}</option>
+                  </select>
+                </div>
+                <label class="mt-3 inline-flex items-center gap-2 text-sm text-n-slate-12">
+                  <input v-model="followUpForm.opt_out_disqualifies" type="checkbox" />
+                  Desqualificar opt-out explicito
+                </label>
+              </div>
+
+              <div class="rounded-md border border-n-weak bg-n-alpha-1 p-3">
+                <div class="flex items-center justify-between gap-3">
+                  <h4 class="text-sm font-semibold text-n-slate-12">Retorno longo</h4>
+                  <label class="inline-flex items-center gap-2 text-sm text-n-slate-12">
+                    <input v-model="followUpForm.long_term_enabled" type="checkbox" />
+                    Ativo
+                  </label>
+                </div>
+                <div class="mt-3 grid gap-2 md:grid-cols-2">
+                  <input v-model="followUpForm.long_term_delay_value" type="number" min="1" class="crm-control rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
+                  <select v-model="followUpForm.long_term_delay_unit" class="crm-control rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12">
+                    <option v-for="unit in durationUnits" :key="unit.value" :value="unit.value">{{ unit.label }}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="rounded-md border border-n-weak bg-n-alpha-1 p-3">
+                <div class="flex items-center justify-between gap-3">
+                  <h4 class="text-sm font-semibold text-n-slate-12">Horario comercial</h4>
+                  <label class="inline-flex items-center gap-2 text-sm text-n-slate-12">
+                    <input v-model="followUpForm.business_hours_enabled" type="checkbox" />
+                    Ativo
+                  </label>
+                </div>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <label v-for="day in weekdayOptions" :key="day.value" class="inline-flex items-center gap-1 rounded-md border border-n-weak px-2 py-1 text-xs text-n-slate-12">
+                    <input v-model="followUpForm.business_days" :value="day.value" type="checkbox" />
+                    {{ day.label }}
+                  </label>
+                </div>
+                <div class="mt-3 grid gap-2 md:grid-cols-2">
+                  <input v-model="followUpForm.business_start" type="time" class="crm-control rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
+                  <input v-model="followUpForm.business_end" type="time" class="crm-control rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-5 rounded-md border border-n-weak bg-n-alpha-1 p-3">
+            <div class="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <h4 class="text-sm font-semibold text-n-slate-12">Excecoes por canal</h4>
+                <p class="text-xs text-n-slate-11">Sobrescreva apenas timing e limite de tentativas quando necessario.</p>
+              </div>
+              <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12 hover:bg-n-alpha-2" type="button" @click="addChannelOverride">
+                <span class="i-lucide-plus size-4" />
+                Canal
+              </button>
+            </div>
+            <div class="space-y-2">
+              <div
+                v-for="rule in followUpForm.channel_overrides"
+                :key="rule.id"
+                class="grid gap-2 lg:grid-cols-[1fr_120px_150px_150px_auto]"
+              >
+                <select v-model="rule.channel" class="crm-control rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12">
+                  <option value="">Selecione</option>
+                  <option v-for="channel in channelOptions" :key="channel.value" :value="channel.value">{{ channel.label }}</option>
+                </select>
+                <input v-model="rule.delay_value" type="number" min="1" class="crm-control rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
+                <select v-model="rule.delay_unit" class="crm-control rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12">
+                  <option v-for="unit in durationUnits" :key="unit.value" :value="unit.value">{{ unit.label }}</option>
+                </select>
+                <input v-model="rule.max_attempts" type="number" min="0" class="crm-control rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" placeholder="Tentativas" />
+                <button class="text-sm text-n-ruby-10 hover:text-n-ruby-11" type="button" @click="removeChannelOverride(rule)">Remover</button>
+              </div>
+              <p v-if="!followUpForm.channel_overrides.length" class="text-sm text-n-slate-11">
+                Nenhuma excecao. Todos os canais herdam a regra principal do funil.
+              </p>
+            </div>
+          </div>
+
+          <button class="mt-4 rounded-md bg-n-blue-9 px-3 py-2 text-sm font-semibold text-white" type="submit">
+            Salvar follow-up
+          </button>
+        </form>
       </section>
 
       <section v-if="activeConfigTab === 'webhooks'" class="crm-config-panel crm-config-panel-compact mt-3 border border-n-weak bg-n-solid-1 p-4">
@@ -1288,7 +1735,7 @@ onBeforeUnmount(() => {
                     </button>
                     <div
                       v-if="openStageMenuId === stage.id"
-                      class="absolute right-0 z-30 mt-2 w-48 overflow-hidden rounded-md border border-n-weak bg-n-solid-1 py-1 shadow-lg"
+                      class="crm-popover-menu absolute right-0 z-30 mt-2 w-56 overflow-hidden rounded-md border border-n-weak bg-n-solid-1 py-1 shadow-lg"
                     >
                       <button class="crm-menu-item" type="button" @click="runStageMenuAction(openStageSettings)">
                         <span class="i-lucide-settings-2 size-4" />
@@ -1332,7 +1779,7 @@ onBeforeUnmount(() => {
                       </button>
                       <div
                         v-if="openCardMenuId === card.id"
-                        class="absolute right-0 z-30 mt-2 w-52 overflow-hidden rounded-md border border-n-weak bg-n-solid-1 py-1 shadow-lg"
+                        class="crm-popover-menu absolute right-0 z-30 mt-2 w-56 overflow-hidden rounded-md border border-n-weak bg-n-solid-1 py-1 shadow-lg"
                         @click.stop
                       >
                         <button class="crm-menu-item" type="button" @click="runCardMenuAction(() => editCard(card))">
@@ -1392,11 +1839,18 @@ onBeforeUnmount(() => {
                     {{ productAvailabilityLabel(card.product) }}
                   </span>
                   <span v-if="card.auto_created" class="crm-card-chip">Auto</span>
+                  <span v-if="card.metadata?.follow_up_override?.mode === 'paused'" class="crm-card-chip">Follow-up pausado</span>
+                  <span v-if="card.metadata?.follow_up_override?.mode === 'manual'" class="crm-card-chip">Follow-up especifico</span>
+                  <span v-if="followUpIntentLabel(card)" class="crm-card-chip">{{ followUpIntentLabel(card) }}</span>
                   <span v-if="card.status !== 'open'" class="crm-card-chip">{{ card.status }}</span>
                 </div>
                 <p v-if="card.next_activity_at" class="mt-3 flex items-center gap-1.5 text-xs text-n-slate-11">
                   <span class="i-lucide-calendar-clock size-3.5 text-n-blue-11" />
                   {{ formatDateTime(card.next_activity_at) }}
+                </p>
+                <p v-if="card.next_follow_up" class="mt-2 flex items-center gap-1.5 text-xs text-n-slate-11">
+                  <span class="i-lucide-repeat-2 size-3.5 text-n-blue-11" />
+                  Follow-up {{ formatDateTime(card.next_follow_up.scheduled_for) }}
                 </p>
                 <p v-if="pendingCardMoveIds.includes(card.id)" class="mt-2 flex items-center gap-1.5 text-xs font-medium text-n-blue-11">
                   <span class="i-lucide-loader-circle size-3 animate-spin" />
@@ -1499,11 +1953,23 @@ onBeforeUnmount(() => {
           <div class="grid grid-cols-2 gap-3">
             <label class="block">
               <span class="mb-1 block text-sm font-medium text-n-slate-12">Contato ID</span>
-              <input v-model="cardForm.contact_id" type="number" class="w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-n-slate-12" />
+              <input
+                v-model="cardForm.contact_id"
+                type="number"
+                class="w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-n-slate-12"
+                :readonly="isContactLocked"
+                :class="{ 'cursor-not-allowed opacity-70': isContactLocked }"
+              />
             </label>
             <label class="block">
               <span class="mb-1 block text-sm font-medium text-n-slate-12">Conversa ID</span>
-              <input v-model="cardForm.conversation_id" type="number" class="w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-n-slate-12" />
+              <input
+                v-model="cardForm.conversation_id"
+                type="number"
+                class="w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-n-slate-12"
+                :readonly="isConversationLocked"
+                :class="{ 'cursor-not-allowed opacity-70': isConversationLocked }"
+              />
             </label>
           </div>
 
@@ -1536,7 +2002,7 @@ onBeforeUnmount(() => {
                 :disabled="isSummarizing"
                 @click="summarizeConversation"
               >
-                {{ isSummarizing ? 'Gerando...' : 'Gerar com Captain' }}
+                {{ isSummarizing ? 'Gerando...' : 'Gerar resumo' }}
               </button>
             </span>
             <textarea v-model="cardForm.summary" rows="5" class="w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-n-slate-12" />
@@ -1557,6 +2023,15 @@ onBeforeUnmount(() => {
             </select>
           </label>
 
+          <label class="block">
+            <span class="mb-1 block text-sm font-medium text-n-slate-12">Follow-up automatico</span>
+            <select v-model="cardForm.follow_up_mode" class="w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-n-slate-12">
+              <option value="inherit">Usar regra do funil</option>
+              <option value="paused">Pausar neste card</option>
+              <option value="manual" disabled>Follow-up especifico agendado</option>
+            </select>
+          </label>
+
           <div class="flex flex-wrap gap-2">
             <button class="rounded-md bg-n-blue-9 px-4 py-2 text-sm font-semibold text-white" type="submit">
               <span class="i-lucide-save size-4" />
@@ -1570,6 +2045,81 @@ onBeforeUnmount(() => {
         </form>
 
         <section v-if="selectedCard" class="mt-6 space-y-4 border-t border-n-weak pt-5">
+          <div class="border border-n-weak bg-n-alpha-1 p-3">
+            <h3 class="text-sm font-semibold text-n-slate-12">Follow-up automatico</h3>
+            <p v-if="followUpIntentDescription(selectedCard)" class="mt-2 text-sm text-n-slate-11">
+              {{ followUpIntentDescription(selectedCard) }}
+            </p>
+            <p v-if="selectedCard.metadata?.follow_up_override?.mode === 'paused'" class="mt-2 flex items-center gap-1.5 text-sm text-n-slate-11">
+              <span class="i-lucide-pause-circle size-4 text-n-slate-11" />
+              Pausado neste card
+            </p>
+            <p v-else-if="selectedCard.metadata?.follow_up_override?.mode === 'manual' && !selectedCard.next_follow_up" class="mt-2 text-sm text-n-slate-11">
+              Follow-up especifico sem agenda pendente.
+            </p>
+            <p v-else-if="selectedCard.next_follow_up" class="mt-2 flex items-center gap-1.5 text-sm text-n-slate-11">
+              <span class="i-lucide-repeat-2 size-4 text-n-blue-11" />
+              Proximo contato {{ formatDateTime(selectedCard.next_follow_up.scheduled_for) }}
+            </p>
+            <p v-else class="mt-2 text-sm text-n-slate-11">
+              Nenhum follow-up automatico pendente.
+            </p>
+            <p v-if="selectedCard.next_follow_up" class="mt-1 text-xs text-n-slate-11">
+              Tentativa {{ selectedCard.next_follow_up.attempt_number }} ·
+              {{ selectedCard.next_follow_up.source }}
+            </p>
+            <button
+              v-if="selectedCard.next_follow_up"
+              class="mt-3 rounded-md border border-n-ruby-7 px-3 py-2 text-sm text-n-ruby-10"
+              type="button"
+              :disabled="isSavingFollowUpReview"
+              @click="cancelPendingFollowUp"
+            >
+              Cancelar follow-up pendente
+            </button>
+          </div>
+
+          <form
+            v-if="selectedCard.next_follow_up?.metadata?.review_state === 'pending_review'"
+            class="space-y-3 border border-n-weak bg-n-alpha-1 p-3"
+            @submit.prevent="approveFollowUp"
+          >
+            <h3 class="text-sm font-semibold text-n-slate-12">Revisar proximo follow-up</h3>
+            <textarea
+              v-model="followUpReviewForm.generated_message"
+              rows="4"
+              class="w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12"
+            />
+            <div class="flex flex-wrap gap-2">
+              <button class="rounded-md bg-n-blue-9 px-3 py-2 text-sm font-semibold text-white" type="submit" :disabled="isSavingFollowUpReview">
+                Aprovar envio
+              </button>
+              <button class="rounded-md border border-n-ruby-7 px-3 py-2 text-sm text-n-ruby-10" type="button" :disabled="isSavingFollowUpReview" @click="cancelPendingFollowUp">
+                Cancelar
+              </button>
+            </div>
+          </form>
+
+          <form class="space-y-3 border border-n-weak bg-n-alpha-1 p-3" @submit.prevent="createManualFollowUp">
+            <h3 class="text-sm font-semibold text-n-slate-12">Follow-up especifico</h3>
+            <input
+              v-model="manualFollowUpForm.scheduled_for"
+              required
+              type="datetime-local"
+              class="w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12"
+            />
+            <textarea
+              v-model="manualFollowUpForm.message_instruction"
+              rows="3"
+              class="w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12"
+              placeholder="Instrucao livre para a IA neste retorno"
+            />
+            <button class="rounded-md bg-n-blue-9 px-3 py-2 text-sm font-semibold text-white" type="submit" :disabled="isSavingManualFollowUp">
+              <span class="i-lucide-calendar-plus size-4" />
+              {{ isSavingManualFollowUp ? 'Salvando...' : 'Agendar follow-up especifico' }}
+            </button>
+          </form>
+
           <div>
             <h3 class="text-sm font-semibold text-n-slate-12">Agenda do card</h3>
             <div v-if="selectedCard.activities?.length" class="mt-3 space-y-2">
@@ -1887,6 +2437,34 @@ onBeforeUnmount(() => {
   --crm-stage-accent: rgb(var(--slate-9));
 }
 
+.crm-stage-config-dot.accent-green {
+  --crm-stage-accent: rgb(var(--blue-9));
+}
+
+.crm-stage-config-dot.accent-blue {
+  --crm-stage-accent: rgb(var(--ruby-9));
+}
+
+.crm-stage-config-dot.accent-amber {
+  --crm-stage-accent: rgb(var(--amber-9));
+}
+
+.crm-stage-config-dot.accent-violet {
+  --crm-stage-accent: rgb(var(--violet-9));
+}
+
+.crm-stage-config-dot.accent-teal {
+  --crm-stage-accent: rgb(var(--teal-8));
+}
+
+.crm-stage-config-dot.accent-ruby {
+  --crm-stage-accent: rgb(var(--ruby-9));
+}
+
+.crm-stage-config-dot.accent-slate {
+  --crm-stage-accent: rgb(var(--slate-9));
+}
+
 .crm-stage-dot {
   display: block;
   width: 0.625rem;
@@ -1895,6 +2473,15 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   background: var(--crm-stage-accent);
   box-shadow: 0 0 0 3px rgba(255, 91, 37, 0.1);
+}
+
+.crm-stage-config-dot {
+  display: block;
+  width: 0.625rem;
+  height: 0.625rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--crm-stage-accent);
 }
 
 .crm-stage-title {
@@ -1915,6 +2502,10 @@ onBeforeUnmount(() => {
 
 .crm-stage-config-row {
   align-items: center;
+  background: rgb(var(--surface-1));
+}
+
+.crm-stage-config-card {
   background: rgb(var(--surface-1));
 }
 
@@ -2212,6 +2803,10 @@ button:disabled {
 
 .crm-menu-item-danger:hover {
   background: rgb(var(--ruby-3));
+}
+
+.crm-popover-menu {
+  transform-origin: top right;
 }
 
 :global(.dark) .crm-kanban-page {

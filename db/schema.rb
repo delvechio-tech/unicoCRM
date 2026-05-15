@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_05_09_100000) do
+ActiveRecord::Schema[7.1].define(version: 2026_05_15_110000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -865,6 +865,42 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_09_100000) do
     t.index ["stage_id"], name: "index_crm_kanban_cards_on_stage_id"
   end
 
+  create_table "crm_kanban_follow_up_events", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "schedule_id", null: false
+    t.bigint "card_id", null: false
+    t.string "event_type", null: false
+    t.jsonb "data", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["card_id", "created_at"], name: "idx_crm_follow_up_events_card_time"
+    t.index ["schedule_id", "created_at"], name: "idx_crm_follow_up_events_schedule_time"
+  end
+
+  create_table "crm_kanban_follow_up_schedules", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "pipeline_id", null: false
+    t.bigint "card_id", null: false
+    t.bigint "contact_id"
+    t.bigint "conversation_id"
+    t.string "source", null: false
+    t.string "status", default: "scheduled", null: false
+    t.datetime "scheduled_for", null: false
+    t.integer "attempt_number", default: 1, null: false
+    t.integer "cadence_step"
+    t.string "channel_type"
+    t.string "reason"
+    t.text "message_instruction"
+    t.text "generated_message"
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "canceled_at"
+    t.datetime "sent_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "status", "scheduled_for"], name: "idx_crm_follow_up_due"
+    t.index ["card_id", "status"], name: "idx_crm_follow_up_card_status"
+  end
+
   create_table "crm_kanban_pipelines", force: :cascade do |t|
     t.bigint "account_id", null: false
     t.string "name", null: false
@@ -1530,6 +1566,14 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_09_100000) do
   add_foreign_key "crm_kanban_cards", "crm_products", column: "product_id"
   add_foreign_key "crm_kanban_cards", "messages", column: "last_message_id"
   add_foreign_key "crm_kanban_cards", "users", column: "assignee_id"
+  add_foreign_key "crm_kanban_follow_up_events", "accounts"
+  add_foreign_key "crm_kanban_follow_up_events", "crm_kanban_cards", column: "card_id"
+  add_foreign_key "crm_kanban_follow_up_events", "crm_kanban_follow_up_schedules", column: "schedule_id"
+  add_foreign_key "crm_kanban_follow_up_schedules", "accounts"
+  add_foreign_key "crm_kanban_follow_up_schedules", "contacts"
+  add_foreign_key "crm_kanban_follow_up_schedules", "conversations"
+  add_foreign_key "crm_kanban_follow_up_schedules", "crm_kanban_cards", column: "card_id"
+  add_foreign_key "crm_kanban_follow_up_schedules", "crm_kanban_pipelines", column: "pipeline_id"
   add_foreign_key "crm_kanban_pipelines", "accounts"
   add_foreign_key "crm_kanban_stages", "accounts"
   add_foreign_key "crm_kanban_stages", "crm_kanban_pipelines", column: "pipeline_id"
