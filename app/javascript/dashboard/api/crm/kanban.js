@@ -72,8 +72,8 @@ class CrmKanbanAPI extends ApiClient {
     return axios.patch(`${this.url}/webhooks/${id}`, data);
   }
 
-  deleteWebhook(id) {
-    return axios.delete(`${this.url}/webhooks/${id}`);
+  deleteWebhook(id, params = {}) {
+    return axios.delete(`${this.url}/webhooks/${id}`, { params });
   }
 }
 

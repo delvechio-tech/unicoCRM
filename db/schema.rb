@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_03_24_102005) do
+ActiveRecord::Schema[7.1].define(version: 2026_05_09_100000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -723,6 +723,221 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_24_102005) do
     t.index ["user_id"], name: "index_copilot_threads_on_user_id"
   end
 
+  create_table "crm_ai_agent_execution_logs", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "ai_agent_id", null: false
+    t.bigint "conversation_id"
+    t.bigint "message_id"
+    t.string "status", default: "pending", null: false
+    t.string "executor", default: "n8n", null: false
+    t.string "error_message"
+    t.jsonb "request_payload", default: {}, null: false
+    t.jsonb "response_payload", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_crm_ai_agent_execution_logs_on_account_id"
+    t.index ["ai_agent_id"], name: "index_crm_ai_agent_execution_logs_on_ai_agent_id"
+    t.index ["conversation_id"], name: "index_crm_ai_agent_execution_logs_on_conversation_id"
+    t.index ["message_id"], name: "index_crm_ai_agent_execution_logs_on_message_id"
+  end
+
+  create_table "crm_ai_agent_inboxes", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "ai_agent_id", null: false
+    t.bigint "inbox_id", null: false
+    t.boolean "enabled", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "inbox_id", "enabled"], name: "idx_crm_ai_agent_inboxes_lookup"
+    t.index ["account_id"], name: "index_crm_ai_agent_inboxes_on_account_id"
+    t.index ["ai_agent_id", "inbox_id"], name: "idx_crm_ai_agent_inboxes_unique", unique: true
+    t.index ["ai_agent_id"], name: "index_crm_ai_agent_inboxes_on_ai_agent_id"
+    t.index ["inbox_id"], name: "index_crm_ai_agent_inboxes_on_inbox_id"
+  end
+
+  create_table "crm_ai_agent_products", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "ai_agent_id", null: false
+    t.bigint "product_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_crm_ai_agent_products_on_account_id"
+    t.index ["ai_agent_id", "product_id"], name: "idx_crm_ai_agent_products_unique", unique: true
+    t.index ["ai_agent_id"], name: "index_crm_ai_agent_products_on_ai_agent_id"
+    t.index ["product_id"], name: "index_crm_ai_agent_products_on_product_id"
+  end
+
+  create_table "crm_ai_agents", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "name", null: false
+    t.string "gender"
+    t.string "role"
+    t.string "communication_tone"
+    t.string "sales_technique"
+    t.string "n8n_webhook_url"
+    t.boolean "active", default: true, null: false
+    t.boolean "auto_reply_enabled", default: false, null: false
+    t.text "company_context"
+    t.text "objective"
+    t.text "personality"
+    t.jsonb "settings", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "active"], name: "idx_crm_ai_agents_account_active"
+    t.index ["account_id", "name"], name: "index_crm_ai_agents_on_account_id_and_name", unique: true
+    t.index ["account_id"], name: "index_crm_ai_agents_on_account_id"
+  end
+
+  create_table "crm_kanban_actions", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "card_id", null: false
+    t.bigint "user_id"
+    t.string "action_type", null: false
+    t.string "actor_type", default: "manual", null: false
+    t.jsonb "data", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "action_type"], name: "index_crm_kanban_actions_on_account_id_and_action_type"
+    t.index ["account_id"], name: "index_crm_kanban_actions_on_account_id"
+    t.index ["card_id"], name: "index_crm_kanban_actions_on_card_id"
+    t.index ["user_id"], name: "index_crm_kanban_actions_on_user_id"
+  end
+
+  create_table "crm_kanban_activities", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "card_id", null: false
+    t.bigint "contact_id"
+    t.bigint "conversation_id"
+    t.bigint "assignee_id"
+    t.string "title", null: false
+    t.text "description"
+    t.string "activity_type", default: "follow_up", null: false
+    t.string "status", default: "open", null: false
+    t.datetime "due_at"
+    t.datetime "completed_at"
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "status", "due_at"], name: "idx_on_account_id_status_due_at_2e03971aaa"
+    t.index ["account_id"], name: "index_crm_kanban_activities_on_account_id"
+    t.index ["assignee_id"], name: "index_crm_kanban_activities_on_assignee_id"
+    t.index ["card_id"], name: "index_crm_kanban_activities_on_card_id"
+    t.index ["contact_id"], name: "index_crm_kanban_activities_on_contact_id"
+    t.index ["conversation_id"], name: "index_crm_kanban_activities_on_conversation_id"
+  end
+
+  create_table "crm_kanban_cards", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "pipeline_id", null: false
+    t.bigint "stage_id", null: false
+    t.bigint "contact_id"
+    t.bigint "conversation_id"
+    t.bigint "product_id"
+    t.bigint "assignee_id"
+    t.string "title", null: false
+    t.decimal "budget_amount", precision: 12, scale: 2
+    t.string "budget_currency", default: "BRL", null: false
+    t.text "summary"
+    t.text "notes"
+    t.string "status", default: "open", null: false
+    t.string "source", default: "manual", null: false
+    t.integer "position", default: 0, null: false
+    t.datetime "stage_changed_at", null: false
+    t.datetime "last_activity_at"
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "last_message_id"
+    t.datetime "next_activity_at"
+    t.boolean "auto_created", default: false, null: false
+    t.datetime "won_at"
+    t.datetime "lost_at"
+    t.string "lost_reason"
+    t.index ["account_id", "pipeline_id", "stage_id", "position"], name: "idx_crm_kanban_cards_board_order"
+    t.index ["account_id", "status"], name: "idx_crm_kanban_cards_status"
+    t.index ["account_id"], name: "index_crm_kanban_cards_on_account_id"
+    t.index ["assignee_id"], name: "index_crm_kanban_cards_on_assignee_id"
+    t.index ["contact_id"], name: "index_crm_kanban_cards_on_contact_id"
+    t.index ["conversation_id"], name: "index_crm_kanban_cards_on_conversation_id"
+    t.index ["last_message_id"], name: "index_crm_kanban_cards_on_last_message_id"
+    t.index ["pipeline_id"], name: "index_crm_kanban_cards_on_pipeline_id"
+    t.index ["product_id"], name: "index_crm_kanban_cards_on_product_id"
+    t.index ["stage_id"], name: "index_crm_kanban_cards_on_stage_id"
+  end
+
+  create_table "crm_kanban_pipelines", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "name", null: false
+    t.text "description"
+    t.text "ai_rules"
+    t.boolean "default", default: false, null: false
+    t.integer "position", default: 0, null: false
+    t.jsonb "settings", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "default"], name: "index_crm_kanban_pipelines_on_account_id_and_default", where: "(\"default\" = true)"
+    t.index ["account_id", "name"], name: "index_crm_kanban_pipelines_on_account_id_and_name", unique: true
+    t.index ["account_id"], name: "index_crm_kanban_pipelines_on_account_id"
+  end
+
+  create_table "crm_kanban_stages", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "pipeline_id", null: false
+    t.string "name", null: false
+    t.string "color", default: "slate", null: false
+    t.integer "position", default: 0, null: false
+    t.integer "stale_after_days", default: 3, null: false
+    t.integer "win_probability", default: 0, null: false
+    t.jsonb "settings", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "pipeline_id", "position"], name: "idx_crm_kanban_stages_order"
+    t.index ["account_id"], name: "index_crm_kanban_stages_on_account_id"
+    t.index ["pipeline_id"], name: "index_crm_kanban_stages_on_pipeline_id"
+  end
+
+  create_table "crm_kanban_webhooks", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "pipeline_id"
+    t.string "name", null: false
+    t.string "url", null: false
+    t.string "access_token"
+    t.jsonb "events", default: [], null: false
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_crm_kanban_webhooks_on_account_id"
+    t.index ["pipeline_id"], name: "index_crm_kanban_webhooks_on_pipeline_id"
+  end
+
+  create_table "crm_products", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "name", null: false
+    t.string "sku"
+    t.string "category"
+    t.string "currency", default: "BRL", null: false
+    t.decimal "price", precision: 12, scale: 2
+    t.boolean "active", default: true, null: false
+    t.text "description"
+    t.text "faq"
+    t.text "objections"
+    t.text "media_notes"
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "availability_status", default: "in_stock", null: false
+    t.decimal "stock_quantity", precision: 12, scale: 2, default: "0.0", null: false
+    t.decimal "reserved_quantity", precision: 12, scale: 2, default: "0.0", null: false
+    t.decimal "low_stock_threshold", precision: 12, scale: 2, default: "0.0", null: false
+    t.boolean "track_inventory", default: false, null: false
+    t.index ["account_id", "active", "category"], name: "idx_crm_products_account_active_category"
+    t.index ["account_id", "availability_status"], name: "idx_crm_products_account_availability"
+    t.index ["account_id", "name"], name: "index_crm_products_on_account_id_and_name"
+    t.index ["account_id", "sku"], name: "index_crm_products_on_account_id_and_sku", unique: true, where: "((sku IS NOT NULL) AND ((sku)::text <> ''::text))"
+    t.index ["account_id", "track_inventory"], name: "idx_crm_products_account_track_inventory"
+    t.index ["account_id"], name: "index_crm_products_on_account_id"
+  end
+
   create_table "csat_survey_responses", force: :cascade do |t|
     t.bigint "account_id", null: false
     t.bigint "conversation_id", null: false
@@ -1288,6 +1503,39 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_24_102005) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "crm_ai_agent_execution_logs", "accounts"
+  add_foreign_key "crm_ai_agent_execution_logs", "conversations"
+  add_foreign_key "crm_ai_agent_execution_logs", "crm_ai_agents", column: "ai_agent_id"
+  add_foreign_key "crm_ai_agent_execution_logs", "messages"
+  add_foreign_key "crm_ai_agent_inboxes", "accounts"
+  add_foreign_key "crm_ai_agent_inboxes", "crm_ai_agents", column: "ai_agent_id"
+  add_foreign_key "crm_ai_agent_inboxes", "inboxes"
+  add_foreign_key "crm_ai_agent_products", "accounts"
+  add_foreign_key "crm_ai_agent_products", "crm_ai_agents", column: "ai_agent_id"
+  add_foreign_key "crm_ai_agent_products", "crm_products", column: "product_id"
+  add_foreign_key "crm_ai_agents", "accounts"
+  add_foreign_key "crm_kanban_actions", "accounts"
+  add_foreign_key "crm_kanban_actions", "crm_kanban_cards", column: "card_id"
+  add_foreign_key "crm_kanban_actions", "users"
+  add_foreign_key "crm_kanban_activities", "accounts"
+  add_foreign_key "crm_kanban_activities", "contacts"
+  add_foreign_key "crm_kanban_activities", "conversations"
+  add_foreign_key "crm_kanban_activities", "crm_kanban_cards", column: "card_id"
+  add_foreign_key "crm_kanban_activities", "users", column: "assignee_id"
+  add_foreign_key "crm_kanban_cards", "accounts"
+  add_foreign_key "crm_kanban_cards", "contacts"
+  add_foreign_key "crm_kanban_cards", "conversations"
+  add_foreign_key "crm_kanban_cards", "crm_kanban_pipelines", column: "pipeline_id"
+  add_foreign_key "crm_kanban_cards", "crm_kanban_stages", column: "stage_id"
+  add_foreign_key "crm_kanban_cards", "crm_products", column: "product_id"
+  add_foreign_key "crm_kanban_cards", "messages", column: "last_message_id"
+  add_foreign_key "crm_kanban_cards", "users", column: "assignee_id"
+  add_foreign_key "crm_kanban_pipelines", "accounts"
+  add_foreign_key "crm_kanban_stages", "accounts"
+  add_foreign_key "crm_kanban_stages", "crm_kanban_pipelines", column: "pipeline_id"
+  add_foreign_key "crm_kanban_webhooks", "accounts"
+  add_foreign_key "crm_kanban_webhooks", "crm_kanban_pipelines", column: "pipeline_id"
+  add_foreign_key "crm_products", "accounts"
   add_foreign_key "inboxes", "portals"
   create_trigger("accounts_after_insert_row_tr", :generated => true, :compatibility => 1).
       on("accounts").

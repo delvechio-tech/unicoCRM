@@ -27,8 +27,8 @@ Atualizado em: 2026-05-11.
 
 - Frente atual de limpeza: `00 - Revisao e Orquestracao de Handoffs`.
 - Objetivo imediato: organizar documentacao, deploy atual, riscos e proximas frentes antes de mexer em codigo funcional.
-- Deploy atual em producao: `delvechiotech/unicocrm:latest@sha256:fdd660a0e47a8a131ac8fff7531fb88d2f6a6b70c71aed347f7da464c9b579b4`.
-- Esse deploy corresponde a frente `05 - Estoque` e passou por build, push, update Portainer e health check via Node/OpenSSL.
+- Deploy atual em producao: `delvechiotech/unicocrm:latest@sha256:b83d3af607d767d35d72fe28536771860e731bee5689fd5707395aa057a251cf`.
+- Esse deploy corresponde a frente `04 - Kanban CRM` e passou por build, push, update Portainer e health check via Node/OpenSSL.
 - Os demais digests espalhados neste arquivo sao historico por frente. Quando houver conflito, considerar esta secao consolidada como fonte atual.
 - Proxima limpeza recomendada apos documentos: frente `05 - Estoque`, focando em ciclo de vida de produto, duplicacao de UI entre Estoque e Agentes, e validacoes minimas.
 
@@ -342,6 +342,23 @@ Estado atual deste chat:
   - Portainer stack `chatwoot` foi atualizada com `PullImage=true`;
   - tasks da stack passaram a rodar `delvechiotech/unicocrm:latest@sha256:c573fde235b25b70380cb98a13ce77643f569636452011c802859978c6ca4414`;
   - `https://chat.unicocrm.com/` respondeu HTTP `200 OK` apos o deploy.
+- Rodada de configuracao/regras em 2026-05-12:
+  - Kanban ganhou abas persistentes de configuracao por funil: `Kanban`, `Etapas`, `Regras`, `Webhooks` e `Metricas`;
+  - cabecalho superior do funil foi compactado: o nome do funil virou seletor principal e foram removidos badges/textos auxiliares para reduzir altura visual;
+  - painel de regras deixou de ser apenas texto livre e passou a ter regras estruturadas em `pipeline.settings['automation_rules']`;
+  - template `Conversas atrasadas` cria etapas e regras iniciais para `Novas Conversas`, `Nao Lidas`, `Lidas` e `Respondida`;
+  - `Crm::Kanban::AutoSyncService` avalia regras ativas por funil antes do fallback para o pipeline comercial;
+  - mensagens recebidas podem criar/atualizar card no funil/etapa configurados; mensagens enviadas pelo time podem mover card existente para `Respondida`, mas nao criam card novo sozinhas;
+  - impacto Chat 01: listener do Kanban agora tambem enfileira mensagens publicas de saida para classificar cards existentes; nao houve mudanca no provider Quepasa nem no parsing de webhook;
+  - impacto Chat 03: ajuste visual/UX localizado no Kanban seguindo `DESIGN_SYSTEM.md`;
+  - validacao parcial: `git diff --check` passou; Ruby/specs via Docker ficaram bloqueados porque o Docker Desktop nao expos `dockerDesktopLinuxEngine` no pipe local durante esta etapa.
+  - build/push/deploy executados apos autorizacao do Thiago:
+    - `docker image build -f docker/Dockerfile -t delvechiotech/unicocrm:latest .` passou;
+    - `docker image push delvechiotech/unicocrm:latest` publicou `sha256:aa3715260cce30505565d715a085f1fa56b293429a07586ae4c95b62d7c43302`;
+    - Portainer stack `chatwoot` foi atualizada com `PullImage=true`;
+    - `chatwoot_chatwoot_app` e `chatwoot_chatwoot_sidekiq` ficaram com update `completed` usando o digest novo;
+    - `https://chat.unicocrm.com/` respondeu HTTP `200 OK`;
+    - `https://chat.unicocrm.com/health` respondeu HTTP `200 OK` com `{"status":"woot"}`.
 
 Arquivos sensiveis deste chat:
 
@@ -753,6 +770,164 @@ No final, escreva um handoff completo para eu voltar para o chat anterior, inclu
 6. Proximos passos recomendados.
 7. Se houve ou nao git commit/push.
 ```
+
+## Atualizacao 2026-05-11 - Frente 04 Kanban CRM
+
+Status:
+
+- Foi feita uma passada de estabilizacao do Kanban nativo CRM.
+- A arvore estava limpa no inicio (`git status --short` sem saida).
+- Nao houve commit, push ou deploy.
+
+Alteracoes:
+
+- `app/listeners/crm/kanban_listener.rb`: listener ignora evento sem mensagem antes de enfileirar `Crm::KanbanAutoSyncJob`.
+- `app/services/crm/kanban/auto_sync_service.rb`: sync automatico procura card aberto ativo na conta inteira antes de criar no funil padrao, usa `account.with_lock` e tolera metadata nula.
+- `app/controllers/api/v1/accounts/crm/kanban_controller.rb`: metricas de atividades passaram a ser por pipeline, webhook update/delete ficou limitado ao pipeline visivel/global, e `last_message` foi preloaded no board.
+- `app/javascript/dashboard/api/crm/kanban.js`: delete de webhook aceita params para enviar `pipeline_id`.
+- `app/javascript/dashboard/routes/dashboard/crm/kanban/Index.vue`: tratamento de erro mais consistente e normalizacao do payload de produtos.
+- `spec/listeners/crm/kanban_listener_spec.rb`: cobertura minima do listener.
+- `spec/services/crm/kanban/auto_sync_service_spec.rb`: cobertura minima de criacao e anti-duplicidade entre funis.
+
+Impactos:
+
+- Chat 01: sync automatico por mensagem foi ajustado, mas sem alterar Quepasa/WhatsApp diretamente. Precisa validar com mensagem incoming real.
+- Chat 02: sem mudanca em tools/payloads de IA.
+- Chat 03: sem redesenho; apenas robustez no `Index.vue`.
+- Chat 05: Kanban ficou mais tolerante ao formato de resposta de produtos, sem mudar estoque/modelo.
+
+Validacoes:
+
+- `git diff --check` passou.
+- Docker Desktop foi aberto e validado.
+- Foi criado override temporario local em `C:\tmp\unicocrm-compose-postgres-override.yml` para o Postgres dev aceitar `POSTGRES_HOST_AUTH_METHOD=trust`; arquivo fora do repo.
+- Banco de teste foi criado/preparado via Docker.
+- `docker compose -f docker-compose.yaml -f C:\tmp\unicocrm-compose-postgres-override.yml run --rm --no-deps -e RAILS_ENV=test -e NODE_ENV=test rails bundle exec rspec spec/listeners/crm/kanban_listener_spec.rb spec/services/crm/kanban/auto_sync_service_spec.rb` passou: 4 exemplos, 0 falhas.
+- `node --check app/javascript/dashboard/api/crm/kanban.js` passou.
+- App local respondeu `http://localhost:3000/health` com `{"status":"woot"}`.
+- Tentativa de abrir UI local ficou limitada pelo Vite Docker dev: `pnpm install --force` no start e respostas vazias/timeout enquanto reinstala dependencias. A validacao visual local ainda nao foi concluida.
+
+Pendencias:
+
+- Validar manualmente criar/mover/arquivar card, atividade, webhook e produto/estoque.
+- Validar sync automatico com mensagem real em producao/homologacao.
+
+### Incremento UX Kanban 2026-05-11
+
+- Foi iniciada a implementacao incremental do Patagon de navegacao/configuracao do Kanban.
+- Primeira fatia aplicada: o formulario de criar/editar funil em `Index.vue` agora inclui `Regras do funil` e salva o campo existente `ai_rules` junto com nome/descricao.
+- O titulo da pagina agora mostra o nome do funil ativo quando carregado.
+- Sem alteracao em backend, banco, jobs, Quepasa/WhatsApp, tools de IA ou estoque.
+- Impacto Chat 03: ajuste visual/UX localizado no Kanban.
+- Validacao executada: `git diff --check` passou.
+- Nao houve commit, push ou deploy.
+
+### Incremento UX Kanban - menu do funil 2026-05-11
+
+- Segunda fatia aplicada no `Index.vue`: menu de tres pontinhos no funil ativo.
+- O menu agrupa `Configurar funil`, `Regras`, `Etapas`, `Webhooks` e `Excluir funil` para funis nao padrao.
+- `Novo funil` segue visivel como acao principal.
+- A exclusao via menu reaproveita `deletePipeline`, sem mudar a regra atual de confirmacao/exclusao.
+- Sem impacto novo em Chat 01, Chat 02 ou Chat 05.
+- Impacto Chat 03: ajuste visual/UX localizado.
+- Validacao: `git diff --check` passou.
+- Nao houve commit, push ou deploy.
+
+### Incremento Kanban - SLA, filtros e templates 2026-05-11
+
+- Foi implementada estrategia hibrida de SLA/urgencia:
+  - cards com conversa vinculada usam o SLA nativo do Chatwoot (`applied_sla`);
+  - cards sem SLA/conversa usam regra propria do Kanban por `stale_after_days` da etapa.
+- `kanban_controller.rb` passou a enviar `urgency` no payload do card e `sla_missed_cards` nas metricas.
+- `Index.vue` passou a renderizar chip de urgencia, metrica `SLA vencido`, busca e filtros rapidos.
+- Criacao de funil ganhou templates: Vendas, Suporte, Recuperacao e Onboarding.
+- Templates criam etapas iniciais com prazos e probabilidades, sem migration nova.
+- Sem impacto novo em Chat 01, Chat 02 ou Chat 05.
+- Impacto Chat 03: ajuste visual/UX localizado no Kanban.
+- Validacoes:
+  - `git diff --check` passou;
+  - sintaxe Ruby do controller passou via Docker;
+  - banco de teste precisou de `rails db:migrate` porque estava com migrations pendentes;
+  - specs de listener e auto-sync passaram com 4 exemplos, 0 falhas.
+- `db/schema.rb` foi restaurado apos migracao local de teste.
+- Nao houve commit, push ou deploy.
+
+### Deploy Frente 04 Kanban CRM 2026-05-11
+
+- Publicacao autorizada e executada.
+- Build:
+  - `docker image build -f docker/Dockerfile -t delvechiotech/unicocrm:latest .`
+  - build passou com assets precompilados.
+- Push Docker Hub:
+  - `docker image push delvechiotech/unicocrm:latest`
+  - digest: `sha256:6c74ae1ac4f060c690bb72da85b586e9a7ec14dcd877db3be80e78237e091748`.
+- Deploy:
+  - Stack Portainer `chatwoot` atualizada com `PullImage=true`.
+  - `chatwoot_chatwoot_app` e `chatwoot_chatwoot_sidekiq` ficaram `completed/update completed`.
+  - Ambos apontam para `delvechiotech/unicocrm:latest@sha256:6c74ae1ac4f060c690bb72da85b586e9a7ec14dcd877db3be80e78237e091748`.
+- Health:
+  - `https://chat.unicocrm.com/` HTTP 200;
+  - `https://chat.unicocrm.com/health` HTTP 200 com `{"status":"woot"}` via Node.
+- Observacao: PowerShell/curl local tiveram falhas pontuais de TLS/conexao ao validar `/health`; Node confirmou o endpoint.
+- Sem git commit e sem git push de codigo.
+
+### Incremento UX Kanban - menu de cards 2026-05-11
+
+- Quarta fatia aplicada no `Index.vue`: menu de tres pontinhos em cada card.
+- Acoes iniciais: editar card, abrir conversa, resumo IA e arquivar card.
+- Abertura de conversa depende de conversa vinculada.
+- Resumo IA reaproveita o fluxo existente do painel lateral; nao houve mudanca em tools/payloads de IA.
+- Arquivamento reaproveita `deleteCard`, preservando a regra de arquivar em vez de apagar historico.
+- Sem impacto novo em Chat 01, Chat 02 ou Chat 05.
+- Impacto Chat 03: ajuste visual/UX localizado.
+- Validacao: `git diff --check` passou.
+- Nao houve commit, push ou deploy.
+
+### Incremento UX Kanban - menu de etapas e fechamento rapido 2026-05-11
+
+- Terceira fatia aplicada no `Index.vue`: menu de tres pontinhos no header de cada etapa/coluna.
+- Menu de etapa inclui `Editar etapa` e `Excluir etapa`.
+- `Editar etapa` abre o painel existente de configuracao das etapas; `Excluir etapa` reaproveita `deleteStage`.
+- `Esc` fecha menus, paineis de configuracao e painel lateral de card.
+- Clique fora fecha paineis principais, menus e painel lateral.
+- Sem impacto novo em Chat 01, Chat 02 ou Chat 05.
+- Impacto Chat 03: ajuste visual/UX localizado.
+- Validacao: `git diff --check` passou.
+- Nao houve commit, push ou deploy.
+
+### Incremento UX Kanban - compactacao e configuracao 2026-05-12
+
+- Frente 04 compactou a UI do Kanban para reduzir espaco inutil no topo, abas, metricas, colunas e cards.
+- Busca/filtro ficam restritos a aba `Kanban`; abas de configuracao ficam mais diretas.
+- Cards passaram a usar chip curto de urgencia (`Em dia`, `Atencao`, `Atrasado`, `SLA vencido`) para evitar sobreposicao no titulo.
+- Aba `Etapas` foi refeita como tabela compacta com nome, cor, prazo parado, chance e acoes; a cor configurada alimenta o acento da coluna.
+- Aba `Webhooks` foi reorganizada em formulario horizontal + lista/tabela.
+- Metricas seguem como calculos automaticos de status, atividades e SLA/regra propria; gatilhos automaticos continuam na aba `Regras`.
+- Ajuste posterior removeu repeticao visual entre toolbar superior, abas e menu do funil: a navegacao principal fica nas abas; o menu fica focado em configurar, criar e excluir funil.
+- Impacto Chat 03: ajuste visual/UX localizado.
+- Sem impacto novo em Chat 01, Chat 02 ou Chat 05.
+- Build/push/deploy executados:
+  - Docker Hub publicou `sha256:b83d3af607d767d35d72fe28536771860e731bee5689fd5707395aa057a251cf`;
+  - Portainer atualizou `chatwoot_chatwoot_app` e `chatwoot_chatwoot_sidekiq` com update `completed`;
+  - `/health` respondeu HTTP 200 com `{"status":"woot"}`.
+- Sem git commit e sem git push de codigo.
+
+### Incremento UX Kanban - board como area principal 2026-05-14
+
+- Frente 04 aplicou uma compactacao adicional no modo board.
+- Funil ativo, busca, filtro, metrica rapida, menu do funil e `Novo card` ficam na mesma faixa para reduzir espaco morto.
+- As abas aparecem apenas quando uma configuracao esta aberta; em `Kanban`, o board sobe e ocupa mais tela.
+- Regras, etapas, webhooks, metricas e configuracoes do funil seguem acessiveis pelo menu de tres pontos e/ou abas de configuracao quando abertas.
+- Sem impacto novo em Chat 01, Chat 02 ou Chat 05.
+- Impacto Chat 03: ajuste visual/UX localizado.
+- Validacoes:
+  - `git diff --check` passou;
+  - `node --check app/javascript/dashboard/api/crm/kanban.js` passou;
+  - specs de listener e auto-sync passaram com 7 exemplos e 0 falhas.
+- Build/push/deploy executados:
+  - Docker Hub publicou `sha256:472ccedbdc120b3d15791580380bb29526eb2bfc1a3e89e71081ce9cf577acdf`;
+  - Portainer atualizou `chatwoot_chatwoot_app` e `chatwoot_chatwoot_sidekiq` com update `completed`;
+  - `/health` respondeu HTTP 200 com `{"status":"woot"}`.
 
 ## Prompt base para criar outros chats
 

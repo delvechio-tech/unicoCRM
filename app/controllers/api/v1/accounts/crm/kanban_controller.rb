@@ -1,4 +1,39 @@
 class Api::V1::Accounts::Crm::KanbanController < Api::V1::Accounts::BaseController
+  PIPELINE_TEMPLATES = {
+    'sales' => [
+      { name: 'Novos leads', color: 'blue', stale_after_days: 2, win_probability: 10 },
+      { name: 'Qualificacao', color: 'teal', stale_after_days: 3, win_probability: 25 },
+      { name: 'Proposta enviada', color: 'amber', stale_after_days: 4, win_probability: 55 },
+      { name: 'Negociacao', color: 'ruby', stale_after_days: 3, win_probability: 75 },
+      { name: 'Ganhou', color: 'green', stale_after_days: 0, win_probability: 100 },
+      { name: 'Perdido', color: 'slate', stale_after_days: 0, win_probability: 0 }
+    ].freeze,
+    'support' => [
+      { name: 'Novas conversas', color: 'ruby', stale_after_days: 1, win_probability: 10 },
+      { name: 'Nao lidas', color: 'amber', stale_after_days: 1, win_probability: 25 },
+      { name: 'Lidas', color: 'blue', stale_after_days: 2, win_probability: 50 },
+      { name: 'Respondida', color: 'teal', stale_after_days: 2, win_probability: 80 }
+    ].freeze,
+    'delayed_conversations' => [
+      { name: 'Novas Conversas', color: 'ruby', stale_after_days: 1, win_probability: 10 },
+      { name: 'Nao Lidas', color: 'amber', stale_after_days: 1, win_probability: 25 },
+      { name: 'Lidas', color: 'blue', stale_after_days: 2, win_probability: 50 },
+      { name: 'Respondida', color: 'teal', stale_after_days: 2, win_probability: 80 }
+    ].freeze,
+    'recovery' => [
+      { name: 'Contatar ASAP', color: 'amber', stale_after_days: 1, win_probability: 20 },
+      { name: 'Coleta de informacoes', color: 'violet', stale_after_days: 3, win_probability: 40 },
+      { name: 'Tratativas criticas', color: 'ruby', stale_after_days: 2, win_probability: 60 },
+      { name: 'Informacoes finais', color: 'teal', stale_after_days: 4, win_probability: 85 }
+    ].freeze,
+    'onboarding' => [
+      { name: 'Novo cliente', color: 'blue', stale_after_days: 2, win_probability: 20 },
+      { name: 'Setup', color: 'violet', stale_after_days: 3, win_probability: 45 },
+      { name: 'Treinamento', color: 'teal', stale_after_days: 5, win_probability: 70 },
+      { name: 'Ativo', color: 'green', stale_after_days: 0, win_probability: 100 }
+    ].freeze
+  }.freeze
+
   before_action :pipeline
 
   def show
@@ -17,7 +52,7 @@ class Api::V1::Accounts::Crm::KanbanController < Api::V1::Accounts::BaseControll
         position: Current.account.crm_kanban_pipelines.maximum(:position).to_i + 1
       )
     )
-    record.ensure_default_stages!
+    apply_pipeline_template!(record, params.dig(:pipeline, :template))
     @pipeline = record
     render json: board_payload, status: :created
   end
@@ -180,7 +215,7 @@ class Api::V1::Accounts::Crm::KanbanController < Api::V1::Accounts::BaseControll
   end
 
   def fetch_webhook
-    Current.account.crm_kanban_webhooks.find(params[:webhook_id])
+    visible_webhooks.find(params[:webhook_id])
   end
 
   def next_card_position(stage)
@@ -201,7 +236,9 @@ class Api::V1::Accounts::Crm::KanbanController < Api::V1::Accounts::BaseControll
   end
 
   def pipeline_params
-    params.require(:pipeline).permit(:name, :description, :ai_rules, settings: {})
+    permitted = params.require(:pipeline).permit(:name, :description, :ai_rules)
+    permitted[:settings] = params[:pipeline][:settings].permit!.to_h if params[:pipeline][:settings].present?
+    permitted
   end
 
   def stage_params
@@ -241,7 +278,7 @@ class Api::V1::Accounts::Crm::KanbanController < Api::V1::Accounts::BaseControll
   def board_payload
     cards = pipeline.cards
                     .active
-                    .includes(:contact, :conversation, :product, :assignee, :stage)
+                    .includes(:contact, :product, :assignee, :stage, :last_message, conversation: { applied_sla: :sla_policy })
                     .ordered
 
     {
@@ -257,6 +294,47 @@ class Api::V1::Accounts::Crm::KanbanController < Api::V1::Accounts::BaseControll
   def visible_webhooks
     scoped = Current.account.crm_kanban_webhooks
     scoped.where(pipeline: pipeline).or(scoped.where(pipeline_id: nil))
+  end
+
+  def apply_pipeline_template!(record, template)
+    stages = PIPELINE_TEMPLATES[template.presence] || Crm::KanbanPipeline::DEFAULT_STAGES
+
+    record.stages.destroy_all
+    stages.each_with_index do |stage_attributes, index|
+      record.stages.create!(
+        stage_attributes.merge(account: Current.account, position: index)
+      )
+    end
+    apply_automation_template!(record, template)
+  end
+
+  def apply_automation_template!(record, template)
+    return unless template == 'delayed_conversations'
+
+    stage_by_name = record.stages.index_by(&:name)
+    record.update!(
+      settings: record.settings.to_h.merge(
+        'automation_rules' => [
+          automation_rule('Respondida', 'agent_replied', stage_by_name['Respondida']),
+          automation_rule('Nao lidas', 'unread', stage_by_name['Nao Lidas']),
+          automation_rule('Lidas aguardando resposta', 'waiting_reply', stage_by_name['Lidas']),
+          automation_rule('Novas conversas', 'incoming_message', stage_by_name['Novas Conversas'])
+        ].compact
+      )
+    )
+  end
+
+  def automation_rule(name, condition, stage)
+    return if stage.blank?
+
+    {
+      id: "template-#{condition}",
+      name: name,
+      enabled: true,
+      trigger: 'message_created',
+      condition: condition,
+      stage_id: stage.id
+    }
   end
 
   def pipeline_payload(record)
@@ -278,6 +356,7 @@ class Api::V1::Accounts::Crm::KanbanController < Api::V1::Accounts::BaseControll
     ).merge(
       stale_days: card.stale_days,
       stale_level: card.stale_level,
+      urgency: card_urgency_payload(card),
       contact: contact_payload(card.contact),
       conversation: conversation_payload(card.conversation),
       product: product_payload(card.product),
@@ -289,13 +368,18 @@ class Api::V1::Accounts::Crm::KanbanController < Api::V1::Accounts::BaseControll
   end
 
   def metrics_payload(cards)
+    card_ids = cards.map(&:id)
+    urgency_payloads = cards.map { |card| card_urgency_payload(card) }
+    open_activities = Crm::KanbanActivity.open_status.where(account: Current.account, card_id: card_ids)
+
     {
       total_cards: cards.size,
       open_cards: cards.count { |card| card.status == 'open' },
       stale_cards: cards.count { |card| %w[stale critical].include?(card.stale_level) },
+      sla_missed_cards: urgency_payloads.count { |urgency| urgency[:source] == 'chatwoot_sla' && urgency[:level] == 'critical' },
       budget_total: cards.select { |card| card.status == 'open' }.sum { |card| card.budget_amount.to_f },
-      overdue_activities: Crm::KanbanActivity.open_status.where(account: Current.account).where('due_at < ?', Time.current).count,
-      due_today: Crm::KanbanActivity.open_status.where(account: Current.account, due_at: Time.current.all_day).count
+      overdue_activities: open_activities.where('due_at < ?', Time.current).count,
+      due_today: open_activities.where(due_at: Time.current.all_day).count
     }
   end
 
@@ -310,7 +394,113 @@ class Api::V1::Accounts::Crm::KanbanController < Api::V1::Accounts::BaseControll
   def conversation_payload(conversation)
     return nil if conversation.blank?
 
-    conversation.as_json(only: [:id, :display_id, :status, :inbox_id, :last_activity_at])
+    conversation.as_json(only: [:id, :display_id, :status, :inbox_id, :last_activity_at]).merge(
+      applied_sla: applied_sla_payload(conversation.applied_sla)
+    )
+  end
+
+  def card_urgency_payload(card)
+    native_sla = native_sla_urgency_payload(card.conversation)
+    return native_sla if native_sla.present?
+
+    kanban_stage_urgency_payload(card)
+  end
+
+  def native_sla_urgency_payload(conversation)
+    return nil if conversation.blank? || conversation.applied_sla.blank?
+
+    applied_sla = conversation.applied_sla
+    policy = applied_sla.sla_policy
+    threshold = current_sla_threshold(conversation, policy)
+    level = applied_sla_missed?(applied_sla) ? 'critical' : threshold_level(threshold&.dig(:due_at))
+
+    {
+      source: 'chatwoot_sla',
+      type: threshold&.dig(:type),
+      level: level,
+      label: sla_urgency_label(applied_sla, threshold, level),
+      due_at: threshold&.dig(:due_at)&.iso8601,
+      policy_name: policy&.name,
+      status: applied_sla.sla_status
+    }
+  end
+
+  def kanban_stage_urgency_payload(card)
+    {
+      source: 'kanban_stage',
+      type: 'stage_stale',
+      level: card.stale_level,
+      label: kanban_urgency_label(card),
+      due_at: kanban_stage_due_at(card)&.iso8601
+    }
+  end
+
+  def current_sla_threshold(conversation, policy)
+    return nil if policy.blank?
+
+    if conversation.first_reply_created_at.blank? && policy.first_response_time_threshold.present?
+      return sla_threshold('FRT', conversation.created_at, policy.first_response_time_threshold)
+    end
+
+    if conversation.first_reply_created_at.present? &&
+       conversation.waiting_since.present? &&
+       policy.next_response_time_threshold.present?
+      return sla_threshold('NRT', conversation.waiting_since, policy.next_response_time_threshold)
+    end
+
+    return nil if conversation.resolved? || policy.resolution_time_threshold.blank?
+
+    sla_threshold('RT', conversation.created_at, policy.resolution_time_threshold)
+  end
+
+  def sla_threshold(type, starts_at, threshold)
+    return nil if starts_at.blank? || threshold.blank?
+
+    { type: type, due_at: starts_at + threshold.to_i.seconds }
+  end
+
+  def threshold_level(due_at)
+    return 'fresh' if due_at.blank?
+    return 'critical' if due_at.past?
+    return 'stale' if due_at <= 1.hour.from_now
+
+    'fresh'
+  end
+
+  def applied_sla_missed?(applied_sla)
+    applied_sla.missed? || applied_sla.active_with_misses?
+  end
+
+  def sla_urgency_label(applied_sla, threshold, level)
+    type = threshold&.dig(:type) || 'SLA'
+    return "#{type} vencido" if applied_sla_missed?(applied_sla) || level == 'critical'
+    return "#{type} em risco" if level == 'stale'
+
+    "#{type} em dia"
+  end
+
+  def kanban_urgency_label(card)
+    return "#{card.stale_days}d parado" if card.stale_level == 'critical'
+    return "#{card.stale_days}d sem avanco" if card.stale_level == 'stale'
+
+    'Em dia'
+  end
+
+  def kanban_stage_due_at(card)
+    return nil if card.stage_changed_at.blank? || card.stage.stale_after_days.to_i.zero?
+
+    card.stage_changed_at + card.stage.stale_after_days.days
+  end
+
+  def applied_sla_payload(applied_sla)
+    return nil if applied_sla.blank?
+
+    {
+      id: applied_sla.id,
+      sla_policy_id: applied_sla.sla_policy_id,
+      sla_status: applied_sla.sla_status,
+      sla_name: applied_sla.sla_policy&.name
+    }
   end
 
   def product_payload(product)

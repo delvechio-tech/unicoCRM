@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAlert } from 'dashboard/composables';
 import { conversationUrl, frontendURL } from 'dashboard/helper/URLHelper';
@@ -26,13 +26,15 @@ const draggedCardId = ref(null);
 const pendingCardMoveIds = ref([]);
 const isLoading = ref(false);
 const isPipelineOpen = ref(false);
-const isStageOpen = ref(false);
-const isMetricsOpen = ref(false);
-const isRulesOpen = ref(false);
-const isWebhookOpen = ref(false);
+const isPipelineMenuOpen = ref(false);
+const openStageMenuId = ref(null);
+const openCardMenuId = ref(null);
 const isSearchingContacts = ref(false);
 const isSummarizing = ref(false);
 const isSavingActivity = ref(false);
+const boardSearch = ref('');
+const boardFilter = ref('all');
+const activeConfigTab = ref('board');
 
 const cardForm = reactive({
   title: '',
@@ -51,11 +53,56 @@ const rulesForm = reactive({
   ai_rules: '',
 });
 
+const automationRuleForm = reactive({
+  name: '',
+  enabled: true,
+  trigger: 'message_created',
+  condition: 'incoming_message',
+  stage_id: '',
+});
+
 const pipelineForm = reactive({
   id: null,
   name: '',
   description: '',
+  ai_rules: '',
+  template: 'sales',
 });
+
+const pipelineTemplates = [
+  { value: 'sales', label: 'Vendas' },
+  { value: 'delayed_conversations', label: 'Conversas atrasadas' },
+  { value: 'support', label: 'Suporte' },
+  { value: 'recovery', label: 'Recuperacao' },
+  { value: 'onboarding', label: 'Onboarding' },
+];
+
+const configTabs = [
+  { value: 'board', label: 'Kanban', icon: 'i-lucide-kanban-square' },
+  { value: 'stages', label: 'Etapas', icon: 'i-lucide-columns-3' },
+  { value: 'rules', label: 'Regras', icon: 'i-lucide-git-branch-plus' },
+  { value: 'webhooks', label: 'Webhooks', icon: 'i-lucide-webhook' },
+  { value: 'metrics', label: 'Metricas', icon: 'i-lucide-bar-chart-3' },
+];
+
+const ruleConditions = [
+  { value: 'incoming_message', label: 'Mensagem recebida', description: 'Cliente enviou uma nova mensagem publica.' },
+  { value: 'unread', label: 'Nao lida', description: 'Ha mensagem recebida ainda nao lida pelo atendimento.' },
+  { value: 'waiting_reply', label: 'Aguardando resposta', description: 'Cliente esta esperando resposta do time.' },
+  { value: 'agent_replied', label: 'Respondida', description: 'Ultima acao publica veio do time/agente.' },
+  { value: 'open_conversation', label: 'Conversa aberta', description: 'Conversa segue aberta no Chatwoot.' },
+  { value: 'any', label: 'Qualquer conversa', description: 'Regra coringa para fallback do funil.' },
+];
+
+const stageColors = [
+  { value: 'blue', label: 'Azul' },
+  { value: 'teal', label: 'Verde' },
+  { value: 'amber', label: 'Amarelo' },
+  { value: 'violet', label: 'Roxo' },
+  { value: 'ruby', label: 'Vermelho' },
+  { value: 'green', label: 'Ganho' },
+  { value: 'slate', label: 'Neutro' },
+];
 
 const stageForm = reactive({
   name: '',
@@ -82,13 +129,99 @@ const selectedCard = computed(() =>
   cards.value.find(card => card.id === selectedCardId.value)
 );
 
+const pipelineSettings = computed(() => pipeline.value?.settings || {});
+
+const automationRules = computed(() =>
+  Array.isArray(pipelineSettings.value.automation_rules)
+    ? pipelineSettings.value.automation_rules
+    : []
+);
+
+const filteredCards = computed(() => {
+  const searchTerm = boardSearch.value.trim().toLowerCase();
+
+  return cards.value.filter(card => {
+    const matchesSearch =
+      !searchTerm ||
+      [
+        card.title,
+        card.summary,
+        card.notes,
+        card.contact?.name,
+        card.contact?.email,
+        card.contact?.phone_number,
+        card.product?.name,
+        card.conversation?.display_id ? `#${card.conversation.display_id}` : '',
+      ]
+        .filter(Boolean)
+        .some(value => String(value).toLowerCase().includes(searchTerm));
+
+    if (!matchesSearch) return false;
+
+    if (boardFilter.value === 'urgent') {
+      return ['stale', 'critical'].includes(card.urgency?.level || card.stale_level);
+    }
+
+    if (boardFilter.value === 'sla') {
+      return card.urgency?.source === 'chatwoot_sla' && card.urgency?.level === 'critical';
+    }
+
+    if (boardFilter.value === 'today') {
+      return Boolean(card.next_activity_at);
+    }
+
+    if (boardFilter.value === 'auto') {
+      return Boolean(card.auto_created);
+    }
+
+    if (boardFilter.value === 'product') {
+      return Boolean(card.product);
+    }
+
+    return true;
+  });
+});
+
 const visibleCards = stageId =>
-  cards.value
+  filteredCards.value
     .filter(card => card.stage_id === stageId)
     .sort((a, b) => a.position - b.position || b.id - a.id);
 
 const normalizeList = response =>
   response?.data?.payload || response?.data?.data || response?.data || [];
+
+const updateBoardState = data => {
+  pipeline.value = data.pipeline;
+  pipelines.value = data.pipelines || [data.pipeline].filter(Boolean);
+  selectedPipelineId.value = pipeline.value?.id || null;
+  stages.value = data.stages || [];
+  cards.value = data.cards || [];
+  metrics.value = data.metrics || {};
+  webhooks.value = data.webhooks || [];
+  rulesForm.ai_rules = pipeline.value?.ai_rules || '';
+};
+
+const updatePipelineSettings = async nextSettings => {
+  const response = await kanbanAPI.updatePipeline(pipeline.value.id, {
+    pipeline: {
+      settings: {
+        ...pipelineSettings.value,
+        ...nextSettings,
+      },
+    },
+  });
+  updateBoardState(response.data);
+};
+
+const resetAutomationRuleForm = () => {
+  Object.assign(automationRuleForm, {
+    name: '',
+    enabled: true,
+    trigger: 'message_created',
+    condition: 'incoming_message',
+    stage_id: stages.value[0]?.id || '',
+  });
+};
 
 const resetCardForm = (stageId, shouldOpen = true) => {
   selectedCardId.value = null;
@@ -123,21 +256,15 @@ const loadBoard = async () => {
       productsAPI.get(),
     ]);
 
-    pipeline.value = boardResponse.data.pipeline;
-    pipelines.value = boardResponse.data.pipelines || [boardResponse.data.pipeline].filter(Boolean);
-    selectedPipelineId.value = pipeline.value?.id || null;
-    stages.value = boardResponse.data.stages;
-    cards.value = boardResponse.data.cards;
-    metrics.value = boardResponse.data.metrics;
-    webhooks.value = boardResponse.data.webhooks || [];
-    products.value = productsResponse.data;
-    rulesForm.ai_rules = pipeline.value.ai_rules || '';
+    updateBoardState(boardResponse.data);
+    products.value = normalizeList(productsResponse);
+    if (!automationRuleForm.stage_id) resetAutomationRuleForm();
 
     if (!stages.value.some(stage => String(stage.id) === String(cardForm.stage_id))) {
       resetCardForm(null, false);
     }
   } catch (error) {
-    useAlert(error.message || 'Nao foi possivel carregar o Kanban.');
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel carregar o Kanban.');
   } finally {
     isLoading.value = false;
   }
@@ -147,14 +274,7 @@ const reloadCurrentBoard = async () => {
   const response = await kanbanAPI.getBoard(
     selectedPipelineId.value ? { pipeline_id: selectedPipelineId.value } : {}
   );
-  pipeline.value = response.data.pipeline;
-  pipelines.value = response.data.pipelines || [];
-  selectedPipelineId.value = pipeline.value?.id || null;
-  stages.value = response.data.stages;
-  cards.value = response.data.cards;
-  metrics.value = response.data.metrics;
-  webhooks.value = response.data.webhooks || [];
-  rulesForm.ai_rules = pipeline.value.ai_rules || '';
+  updateBoardState(response.data);
 };
 
 const selectPipeline = async () => {
@@ -167,8 +287,54 @@ const openPipelineForm = (record = null) => {
     id: record?.id || null,
     name: record?.name || '',
     description: record?.description || '',
+    ai_rules: record?.ai_rules || '',
+    template: 'sales',
   });
   isPipelineOpen.value = true;
+};
+
+const runPipelineMenuAction = action => {
+  isPipelineMenuOpen.value = false;
+  action();
+};
+
+const runStageMenuAction = action => {
+  openStageMenuId.value = null;
+  action();
+};
+
+const runCardMenuAction = action => {
+  openCardMenuId.value = null;
+  action();
+};
+
+const openConfigTab = tab => {
+  activeConfigTab.value = tab;
+};
+
+const openStageSettings = () => {
+  activeConfigTab.value = 'stages';
+};
+
+const toggleStageMenu = stageId => {
+  openStageMenuId.value = openStageMenuId.value === stageId ? null : stageId;
+};
+
+const toggleCardMenu = cardId => {
+  openCardMenuId.value = openCardMenuId.value === cardId ? null : cardId;
+};
+
+const closeKanbanOverlays = () => {
+  isPipelineMenuOpen.value = false;
+  openStageMenuId.value = null;
+  openCardMenuId.value = null;
+  isPipelineOpen.value = false;
+  activeConfigTab.value = 'board';
+  if (isDetailOpen.value) closeDetailPanel();
+};
+
+const handleEscape = event => {
+  if (event.key === 'Escape') closeKanbanOverlays();
 };
 
 const savePipeline = async () => {
@@ -177,21 +343,16 @@ const savePipeline = async () => {
       pipeline: {
         name: pipelineForm.name,
         description: pipelineForm.description,
+        ai_rules: pipelineForm.ai_rules,
       },
     };
+    if (!pipelineForm.id) payload.pipeline.template = pipelineForm.template;
 
     const response = pipelineForm.id
       ? await kanbanAPI.updatePipeline(pipelineForm.id, payload)
       : await kanbanAPI.createPipeline(payload);
 
-    pipeline.value = response.data.pipeline;
-    pipelines.value = response.data.pipelines || [];
-    selectedPipelineId.value = pipeline.value.id;
-    stages.value = response.data.stages;
-    cards.value = response.data.cards;
-    metrics.value = response.data.metrics;
-    webhooks.value = response.data.webhooks || [];
-    rulesForm.ai_rules = pipeline.value.ai_rules || '';
+    updateBoardState(response.data);
     isPipelineOpen.value = false;
     useAlert(pipelineForm.id ? 'Funil atualizado.' : 'Funil criado.');
   } catch (error) {
@@ -205,14 +366,7 @@ const deletePipeline = async () => {
 
   try {
     const response = await kanbanAPI.deletePipeline(pipeline.value.id);
-    pipeline.value = response.data.pipeline;
-    pipelines.value = response.data.pipelines || [];
-    selectedPipelineId.value = pipeline.value.id;
-    stages.value = response.data.stages;
-    cards.value = response.data.cards;
-    metrics.value = response.data.metrics;
-    webhooks.value = response.data.webhooks || [];
-    rulesForm.ai_rules = pipeline.value.ai_rules || '';
+    updateBoardState(response.data);
     closeDetailPanel();
     useAlert('Funil excluido.');
   } catch (error) {
@@ -232,7 +386,6 @@ const createStage = async () => {
       win_probability: 10,
       color: 'teal',
     });
-    isStageOpen.value = false;
     useAlert('Etapa criada.');
     await reloadCurrentBoard();
   } catch (error) {
@@ -313,7 +466,7 @@ const saveCard = async () => {
     closeDetailPanel();
     await loadBoard();
   } catch (error) {
-    useAlert(error.message || 'Nao foi possivel salvar o card.');
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel salvar o card.');
   }
 };
 
@@ -336,29 +489,121 @@ const summarizeConversation = async () => {
   }
 };
 
+const saveAutomationRule = async () => {
+  if (!automationRuleForm.stage_id) {
+    useAlert('Escolha uma etapa para a regra.');
+    return;
+  }
+
+  const stage = stages.value.find(item => String(item.id) === String(automationRuleForm.stage_id));
+  const nextRule = {
+    id: `rule-${Date.now()}`,
+    name: automationRuleForm.name || `${automationRuleForm.condition} -> ${stage?.name || 'etapa'}`,
+    enabled: automationRuleForm.enabled,
+    trigger: automationRuleForm.trigger,
+    condition: automationRuleForm.condition,
+    stage_id: Number(automationRuleForm.stage_id),
+  };
+
+  try {
+    await updatePipelineSettings({
+      automation_rules: [...automationRules.value, nextRule],
+    });
+    resetAutomationRuleForm();
+    useAlert('Regra adicionada.');
+  } catch (error) {
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel salvar a regra.');
+  }
+};
+
+const toggleAutomationRule = async rule => {
+  try {
+    await updatePipelineSettings({
+      automation_rules: automationRules.value.map(item =>
+        item.id === rule.id ? { ...item, enabled: !item.enabled } : item
+      ),
+    });
+  } catch (error) {
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel atualizar a regra.');
+  }
+};
+
+const deleteAutomationRule = async rule => {
+  try {
+    await updatePipelineSettings({
+      automation_rules: automationRules.value.filter(item => item.id !== rule.id),
+    });
+    useAlert('Regra removida.');
+  } catch (error) {
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel remover a regra.');
+  }
+};
+
+const applyDelayedConversationPreset = async () => {
+  const findStage = terms =>
+    stages.value.find(stage =>
+      terms.some(term => stage.name.toLowerCase().includes(term))
+    );
+
+  const rules = [
+    { condition: 'agent_replied', stage: findStage(['respondida', 'respondido']) },
+    { condition: 'unread', stage: findStage(['nao lida', 'nao lidas', 'não lida', 'não lidas']) },
+    { condition: 'waiting_reply', stage: findStage(['lida', 'lidas', 'aguardando']) },
+    { condition: 'incoming_message', stage: findStage(['nova', 'novas']) || stages.value[0] },
+  ]
+    .filter(item => item.stage)
+    .map((item, index) => ({
+      id: `preset-${item.condition}-${Date.now()}-${index}`,
+      name: ruleConditions.find(condition => condition.value === item.condition)?.label || item.condition,
+      enabled: true,
+      trigger: 'message_created',
+      condition: item.condition,
+      stage_id: item.stage.id,
+    }));
+
+  if (!rules.length) {
+    useAlert('Crie etapas no funil antes de aplicar o modelo.');
+    return;
+  }
+
+  try {
+    await updatePipelineSettings({ automation_rules: rules });
+    useAlert('Modelo de conversas atrasadas aplicado.');
+  } catch (error) {
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel aplicar o modelo.');
+  }
+};
+
+const summarizeCardConversation = card => {
+  editCard(card);
+  summarizeConversation();
+};
+
 const deleteCard = async card => {
   if (!window.confirm(`Arquivar o card ${card.title}?`)) return;
 
-  await kanbanAPI.deleteCard(card.id, { pipeline_id: selectedPipelineId.value });
-  useAlert('Card arquivado.');
-  if (selectedCardId.value === card.id) closeDetailPanel();
-  await loadBoard();
+  try {
+    await kanbanAPI.deleteCard(card.id, { pipeline_id: selectedPipelineId.value });
+    useAlert('Card arquivado.');
+    if (selectedCardId.value === card.id) closeDetailPanel();
+    await loadBoard();
+  } catch (error) {
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel arquivar o card.');
+  }
 };
 
 const saveRules = async () => {
   try {
     const response = await kanbanAPI.updatePipeline(pipeline.value.id, {
-      pipeline: { ai_rules: rulesForm.ai_rules },
+      pipeline: {
+        ai_rules: rulesForm.ai_rules,
+        settings: pipelineSettings.value,
+      },
     });
-    pipeline.value = response.data.pipeline;
-    pipelines.value = response.data.pipelines || [];
-    stages.value = response.data.stages;
-    cards.value = response.data.cards;
-    metrics.value = response.data.metrics;
-    webhooks.value = response.data.webhooks || [];
-    useAlert('Regras da IA atualizadas.');
+    updateBoardState(response.data);
+    useAlert('Regras atualizadas.');
   } catch (error) {
-    useAlert(error.message || 'Nao foi possivel salvar as regras.');
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel salvar as regras.');
   }
 };
 
@@ -379,7 +624,7 @@ const createActivity = async () => {
     await loadBoard();
     selectedCardId.value = selectedCard.value?.id || selectedCardId.value;
   } catch (error) {
-    useAlert(error.message || 'Nao foi possivel criar a atividade.');
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel criar a atividade.');
   } finally {
     isSavingActivity.value = false;
   }
@@ -388,11 +633,15 @@ const createActivity = async () => {
 const completeActivity = async activity => {
   if (!selectedCard.value) return;
 
-  await kanbanAPI.completeActivity(selectedCard.value.id, activity.id, {
-    pipeline_id: selectedPipelineId.value,
-  });
-  useAlert('Atividade concluida.');
-  await loadBoard();
+  try {
+    await kanbanAPI.completeActivity(selectedCard.value.id, activity.id, {
+      pipeline_id: selectedPipelineId.value,
+    });
+    useAlert('Atividade concluida.');
+    await loadBoard();
+  } catch (error) {
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel concluir a atividade.');
+  }
 };
 
 const createWebhook = async () => {
@@ -413,16 +662,20 @@ const createWebhook = async () => {
     useAlert('Webhook criado.');
     await loadBoard();
   } catch (error) {
-    useAlert(error.message || 'Nao foi possivel criar o webhook.');
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel criar o webhook.');
   }
 };
 
 const deleteWebhook = async webhook => {
   if (!window.confirm(`Excluir webhook ${webhook.name}?`)) return;
 
-  await kanbanAPI.deleteWebhook(webhook.id);
-  useAlert('Webhook excluido.');
-  await loadBoard();
+  try {
+    await kanbanAPI.deleteWebhook(webhook.id, { pipeline_id: selectedPipelineId.value });
+    useAlert('Webhook excluido.');
+    await loadBoard();
+  } catch (error) {
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel excluir o webhook.');
+  }
 };
 
 const updateStage = async stage => {
@@ -431,6 +684,7 @@ const updateStage = async stage => {
       pipeline_id: selectedPipelineId.value,
       stage: {
         name: stage.name,
+        color: stage.color,
         stale_after_days: stage.stale_after_days,
         win_probability: stage.win_probability,
       },
@@ -438,7 +692,7 @@ const updateStage = async stage => {
     useAlert('Etapa atualizada.');
     await loadBoard();
   } catch (error) {
-    useAlert(error.message || 'Nao foi possivel salvar a etapa.');
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel salvar a etapa.');
   }
 };
 
@@ -451,6 +705,8 @@ const deleteStage = async stage => {
     await reloadCurrentBoard();
   } catch (error) {
     useAlert(error.response?.data?.error || error.message || 'Nao foi possivel excluir a etapa.');
+  } finally {
+    openStageMenuId.value = null;
   }
 };
 
@@ -479,37 +735,48 @@ const onDrop = async stage => {
     const response = await kanbanAPI.getBoard(
       selectedPipelineId.value ? { pipeline_id: selectedPipelineId.value } : {}
     );
-    pipeline.value = response.data.pipeline;
-    pipelines.value = response.data.pipelines || [];
-    stages.value = response.data.stages;
-    cards.value = response.data.cards;
-    metrics.value = response.data.metrics;
-    webhooks.value = response.data.webhooks || [];
-    rulesForm.ai_rules = pipeline.value.ai_rules || '';
+    updateBoardState(response.data);
   } catch (error) {
     card.stage_id = previousStageId;
-    useAlert(error.message || 'Nao foi possivel mover o card.');
+    useAlert(error.response?.data?.error || error.message || 'Nao foi possivel mover o card.');
   } finally {
     pendingCardMoveIds.value = pendingCardMoveIds.value.filter(id => id !== card.id);
   }
 };
 
 const staleClass = card => {
-  if (card.stale_level === 'critical') return 'border-n-ruby-8';
-  if (card.stale_level === 'stale') return 'border-n-amber-8';
+  const level = card.urgency?.level || card.stale_level;
+  if (level === 'critical') return 'border-n-ruby-8';
+  if (level === 'stale') return 'border-n-amber-8';
   return 'border-n-weak';
 };
 
-const staleLabel = card => {
-  if (card.stale_level === 'critical') return `${card.stale_days}d parado`;
-  if (card.stale_level === 'stale') return `${card.stale_days}d sem avanco`;
+const compactUrgencyLabel = card => {
+  if (card.urgency?.source === 'chatwoot_sla' && card.urgency?.level === 'critical') return 'SLA vencido';
+  if ((card.urgency?.level || card.stale_level) === 'critical') return 'Atrasado';
+  if ((card.urgency?.level || card.stale_level) === 'stale') return 'Atenção';
   return 'Em dia';
 };
 
-const stageAccentClass = index =>
-  ['accent-green', 'accent-blue', 'accent-amber', 'accent-violet', 'accent-teal', 'accent-ruby'][
+const urgencyChipClass = card => {
+  const level = card.urgency?.level;
+  if (level === 'critical') return 'crm-urgency-critical';
+  if (level === 'stale') return 'crm-urgency-stale';
+  return 'crm-urgency-fresh';
+};
+
+const ruleConditionLabel = condition =>
+  ruleConditions.find(item => item.value === condition)?.label || condition;
+
+const ruleStageLabel = stageId =>
+  stages.value.find(stage => stage.id === Number(stageId))?.name || 'Etapa removida';
+
+const stageAccentClass = (stage, index) => {
+  if (stage?.color) return `accent-${stage.color}`;
+  return ['accent-green', 'accent-blue', 'accent-amber', 'accent-violet', 'accent-teal', 'accent-ruby'][
     index % 6
   ];
+};
 
 const formatMoney = (amount, currency = 'BRL') => {
   if (!amount) return 'Sem orcamento';
@@ -558,44 +825,108 @@ const cardConversationUrl = conversation =>
     })
   );
 
-onMounted(loadBoard);
+onMounted(() => {
+  loadBoard();
+  window.addEventListener('keydown', handleEscape);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleEscape);
+});
 </script>
 
 <template>
   <main class="crm-kanban-page flex h-full min-h-0 flex-1 flex-col bg-n-background">
     <header class="crm-page-header border-b border-n-weak px-6 py-4">
-      <div class="crm-title-row flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div class="mb-2 flex items-center gap-2">
-            <span class="crm-eyebrow">CRM Pipeline</span>
-            <span class="crm-live-pill">
-              <span class="i-lucide-radio size-3.5" />
-              Sync ativo
-            </span>
-          </div>
-          <h1 class="text-2xl font-semibold text-n-slate-12">Kanban comercial</h1>
-          <p class="crm-page-subtitle mt-1 max-w-3xl text-sm text-n-slate-11">
-            Oportunidades, conversas e proximas acoes no mesmo fluxo.
-          </p>
+      <div class="crm-title-row flex flex-wrap items-center gap-3">
+        <label class="crm-pipeline-title-select min-w-[220px]">
+          <span class="sr-only">Funil ativo</span>
+          <select v-model="selectedPipelineId" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-1 px-3 py-2 text-base font-semibold text-n-slate-12 outline-none" @change="selectPipeline">
+            <option v-for="item in pipelines" :key="item.id" :value="item.id">
+              {{ item.name }}
+            </option>
+          </select>
+        </label>
+        <div v-if="activeConfigTab === 'board'" class="crm-board-tools flex min-w-[280px] flex-1 flex-wrap items-center gap-2">
+          <label class="crm-board-search min-w-[220px] flex-1">
+            <span class="sr-only">Buscar cards</span>
+            <div class="relative">
+              <span class="i-lucide-search absolute left-3 top-1/2 size-4 -translate-y-1/2 text-n-slate-10" />
+              <input
+                v-model="boardSearch"
+                class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 py-2 pl-9 pr-3 text-sm text-n-slate-12"
+                placeholder="Procurar cards"
+              />
+            </div>
+          </label>
+          <select v-model="boardFilter" class="crm-board-filter crm-control rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12">
+            <option value="all">Todos</option>
+            <option value="urgent">Urgentes</option>
+            <option value="sla">SLA vencido</option>
+            <option value="today">Com agenda</option>
+            <option value="auto">Automaticos</option>
+            <option value="product">Com produto</option>
+          </select>
         </div>
-        <div class="crm-header-actions flex flex-wrap gap-2">
+        <div class="crm-header-actions ml-auto flex flex-wrap items-center gap-2">
           <button
             class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12"
-            :class="{ 'bg-n-alpha-2 text-n-blue-11': isMetricsOpen }"
+            :class="{ 'bg-n-alpha-2 text-n-blue-11': activeConfigTab === 'metrics' }"
             type="button"
-            @click="isMetricsOpen = !isMetricsOpen"
+            @click="openConfigTab(activeConfigTab === 'metrics' ? 'board' : 'metrics')"
           >
             <span class="i-lucide-bar-chart-3 size-4" />
             Metricas · {{ metrics.total_cards || 0 }} ativos
           </button>
-          <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12" type="button" @click="isRulesOpen = !isRulesOpen">
-            <span class="i-lucide-sparkles size-4" />
-            Regras da IA
-          </button>
-          <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12" type="button" @click="isWebhookOpen = !isWebhookOpen">
-            <span class="i-lucide-webhook size-4" />
-            Webhooks
-          </button>
+          <div class="relative" v-on-clickaway="() => (isPipelineMenuOpen = false)">
+            <button
+              class="inline-flex size-10 items-center justify-center rounded-md border border-n-weak text-n-slate-12 hover:bg-n-alpha-2"
+              :class="{ 'bg-n-alpha-2': isPipelineMenuOpen }"
+              type="button"
+              aria-label="Opcoes do funil"
+              @click="isPipelineMenuOpen = !isPipelineMenuOpen"
+            >
+              <span class="i-lucide-more-horizontal size-5" />
+            </button>
+            <div
+              v-if="isPipelineMenuOpen"
+              class="absolute right-0 z-30 mt-2 w-56 overflow-hidden rounded-md border border-n-weak bg-n-solid-1 py-1 shadow-lg"
+            >
+              <button class="crm-menu-item" type="button" @click="runPipelineMenuAction(() => openPipelineForm(pipeline))">
+                <span class="i-lucide-settings-2 size-4" />
+                Configurar funil
+              </button>
+              <button class="crm-menu-item" type="button" @click="runPipelineMenuAction(() => openPipelineForm())">
+                <span class="i-lucide-folder-plus size-4" />
+                Novo funil
+              </button>
+              <button class="crm-menu-item" type="button" @click="runPipelineMenuAction(() => openConfigTab('stages'))">
+                <span class="i-lucide-columns-3 size-4" />
+                Etapas
+              </button>
+              <button class="crm-menu-item" type="button" @click="runPipelineMenuAction(() => openConfigTab('rules'))">
+                <span class="i-lucide-git-branch-plus size-4" />
+                Regras
+              </button>
+              <button class="crm-menu-item" type="button" @click="runPipelineMenuAction(() => openConfigTab('webhooks'))">
+                <span class="i-lucide-webhook size-4" />
+                Webhooks
+              </button>
+              <button class="crm-menu-item" type="button" @click="runPipelineMenuAction(() => openConfigTab('metrics'))">
+                <span class="i-lucide-bar-chart-3 size-4" />
+                Metricas
+              </button>
+              <button
+                v-if="pipeline.id && !pipeline.default"
+                class="crm-menu-item crm-menu-item-danger"
+                type="button"
+                @click="runPipelineMenuAction(deletePipeline)"
+              >
+                <span class="i-lucide-trash-2 size-4" />
+                Excluir funil
+              </button>
+            </div>
+          </div>
           <button class="rounded-md bg-n-blue-9 px-3 py-2 text-sm font-semibold text-white" type="button" @click="resetCardForm()">
             <span class="i-lucide-plus size-4" />
             Novo card
@@ -603,32 +934,21 @@ onMounted(loadBoard);
         </div>
       </div>
 
-      <div class="crm-pipeline-toolbar mt-4 flex flex-wrap items-end justify-between gap-3">
-        <label class="min-w-[240px] flex-1">
-          <span class="mb-1 block text-xs font-semibold uppercase text-n-slate-10">Funil ativo</span>
-          <select v-model="selectedPipelineId" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" @change="selectPipeline">
-            <option v-for="item in pipelines" :key="item.id" :value="item.id">
-              {{ item.name }}
-            </option>
-          </select>
-        </label>
-        <div class="crm-header-actions flex flex-wrap gap-2">
-          <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12" type="button" @click="openPipelineForm(pipeline)">
-            <span class="i-lucide-settings-2 size-4" />
-            Configurar funil
-          </button>
-          <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12" type="button" @click="openPipelineForm()">
-            <span class="i-lucide-folder-plus size-4" />
-            Novo funil
-          </button>
-          <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12" type="button" @click="isStageOpen = !isStageOpen">
-            <span class="i-lucide-columns-3 size-4" />
-            Etapas
-          </button>
-        </div>
-      </div>
+      <nav v-if="activeConfigTab !== 'board'" class="crm-config-tabs mt-2 flex flex-wrap gap-1 border-b border-n-weak">
+        <button
+          v-for="tab in configTabs"
+          :key="tab.value"
+          class="crm-config-tab"
+          :class="{ 'is-active': activeConfigTab === tab.value }"
+          type="button"
+          @click="activeConfigTab = tab.value"
+        >
+          <span :class="tab.icon" class="size-4" />
+          {{ tab.label }}
+        </button>
+      </nav>
 
-      <form v-if="isPipelineOpen" class="crm-config-panel mt-4 border border-n-weak bg-n-solid-1 p-4" @submit.prevent="savePipeline">
+      <form v-if="isPipelineOpen" v-on-clickaway="() => (isPipelineOpen = false)" class="crm-config-panel mt-4 border border-n-weak bg-n-solid-1 p-4" @submit.prevent="savePipeline">
         <div class="mb-4 flex items-start justify-between gap-4">
           <div>
             <h2 class="text-sm font-semibold tracking-tight text-n-slate-12">
@@ -642,7 +962,7 @@ onMounted(loadBoard);
             Fechar
           </button>
         </div>
-        <div class="grid gap-3 md:grid-cols-[1fr_1.3fr_auto]">
+        <div class="grid gap-3 md:grid-cols-[1fr_1.2fr_180px_auto]">
           <label>
             <span class="mb-1 block text-sm font-medium text-n-slate-12">Nome do funil</span>
             <input v-model="pipelineForm.name" required class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
@@ -651,12 +971,28 @@ onMounted(loadBoard);
             <span class="mb-1 block text-sm font-medium text-n-slate-12">Descricao</span>
             <input v-model="pipelineForm.description" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
           </label>
+          <label v-if="!pipelineForm.id">
+            <span class="mb-1 block text-sm font-medium text-n-slate-12">Modelo</span>
+            <select v-model="pipelineForm.template" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12">
+              <option v-for="template in pipelineTemplates" :key="template.value" :value="template.value">
+                {{ template.label }}
+              </option>
+            </select>
+          </label>
           <div class="flex items-end gap-2">
             <button class="rounded-md bg-n-blue-9 px-3 py-2 text-sm font-semibold text-white" type="submit">
               <span class="i-lucide-save size-4" />
               Salvar
             </button>
           </div>
+          <label class="md:col-span-4">
+            <span class="mb-1 block text-sm font-medium text-n-slate-12">Regras do funil</span>
+            <textarea
+              v-model="pipelineForm.ai_rules"
+              class="crm-control min-h-[120px] w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12"
+              placeholder="Ex: criar card quando chegar mensagem nova, priorizar leads quentes, avisar se ficar parado."
+            ></textarea>
+          </label>
         </div>
         <button
           v-if="pipelineForm.id && !pipeline.default"
@@ -668,30 +1004,34 @@ onMounted(loadBoard);
         </button>
       </form>
 
-      <section v-if="isStageOpen" class="crm-config-panel mt-4 border border-n-weak bg-n-solid-1 p-4">
-        <div class="mb-4 flex items-start justify-between gap-4">
+      <section v-if="activeConfigTab === 'stages'" class="crm-config-panel crm-config-panel-compact mt-3 border border-n-weak bg-n-solid-1 p-4">
+        <div class="mb-3 flex items-start justify-between gap-4">
           <div>
-            <h2 class="text-sm font-semibold tracking-tight text-n-slate-12">Configuracao das etapas</h2>
-            <p class="mt-1 text-xs text-n-slate-11">
-              Defina manualmente os prazos e probabilidades sem poluir o board.
-            </p>
+            <h2 class="text-sm font-semibold tracking-tight text-n-slate-12">Etapas do funil</h2>
+            <p class="mt-0.5 text-xs text-n-slate-11">Prazo, chance, cor e exclusao de colunas vazias.</p>
           </div>
-          <button class="text-sm text-n-slate-11 hover:text-n-slate-12" type="button" @click="isStageOpen = false">
-            Fechar
+          <button class="text-sm text-n-slate-11 hover:text-n-slate-12" type="button" @click="activeConfigTab = 'board'">
+            Voltar ao Kanban
           </button>
         </div>
 
-        <form class="grid gap-3 md:grid-cols-[1fr_140px_140px_auto]" @submit.prevent="createStage">
+        <form class="crm-stage-add-row grid gap-2 md:grid-cols-[minmax(220px,1fr)_140px_110px_110px_auto]" @submit.prevent="createStage">
           <label>
-            <span class="mb-1 block text-sm font-medium text-n-slate-12">Nome da etapa</span>
+            <span class="mb-1 block text-xs font-semibold uppercase text-n-slate-10">Nova etapa</span>
             <input v-model="stageForm.name" required class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" placeholder="Ex: Proposta aceita" />
           </label>
           <label>
-            <span class="mb-1 block text-sm font-medium text-n-slate-12">Parado apos</span>
+            <span class="mb-1 block text-xs font-semibold uppercase text-n-slate-10">Cor</span>
+            <select v-model="stageForm.color" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12">
+              <option v-for="color in stageColors" :key="color.value" :value="color.value">{{ color.label }}</option>
+            </select>
+          </label>
+          <label>
+            <span class="mb-1 block text-xs font-semibold uppercase text-n-slate-10">Parado</span>
             <input v-model="stageForm.stale_after_days" type="number" min="0" required class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
           </label>
           <label>
-            <span class="mb-1 block text-sm font-medium text-n-slate-12">Chance %</span>
+            <span class="mb-1 block text-xs font-semibold uppercase text-n-slate-10">Chance</span>
             <input v-model="stageForm.win_probability" type="number" min="0" max="100" required class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
           </label>
           <div class="flex items-end gap-2">
@@ -702,32 +1042,45 @@ onMounted(loadBoard);
           </div>
         </form>
 
-        <div v-if="stages.length" class="mt-5 space-y-2">
+        <div v-if="stages.length" class="crm-stage-table mt-4 overflow-hidden rounded-md border border-n-weak">
+          <div class="crm-stage-table-head grid gap-2 px-3 py-2 text-xs font-semibold uppercase text-n-slate-10 md:grid-cols-[minmax(220px,1fr)_140px_110px_110px_88px]">
+            <span>Etapa</span>
+            <span>Cor</span>
+            <span>Parado</span>
+            <span>Chance</span>
+            <span class="text-right">Acoes</span>
+          </div>
           <article
             v-for="stage in stages"
             :key="`stage-config-${stage.id}`"
-            class="crm-stage-config-row grid gap-3 border border-n-weak bg-n-alpha-1 p-3 md:grid-cols-[minmax(0,1fr)_140px_140px_auto]"
+            class="crm-stage-config-row grid gap-2 border-t border-n-weak px-3 py-2 md:grid-cols-[minmax(220px,1fr)_140px_110px_110px_88px]"
           >
             <label>
-              <span class="mb-1 block text-xs font-medium uppercase text-n-slate-10">Etapa</span>
+              <span class="sr-only">Etapa</span>
               <input v-model="stage.name" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" @change="updateStage(stage)" />
             </label>
             <label>
-              <span class="mb-1 block text-xs font-medium uppercase text-n-slate-10">Parado apos</span>
+              <span class="sr-only">Cor</span>
+              <select v-model="stage.color" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" @change="updateStage(stage)">
+                <option v-for="color in stageColors" :key="color.value" :value="color.value">{{ color.label }}</option>
+              </select>
+            </label>
+            <label>
+              <span class="sr-only">Parado apos</span>
               <div class="crm-stage-number">
                 <input v-model="stage.stale_after_days" type="number" min="0" @change="updateStage(stage)" />
                 <b>d</b>
               </div>
             </label>
             <label>
-              <span class="mb-1 block text-xs font-medium uppercase text-n-slate-10">Chance</span>
+              <span class="sr-only">Chance</span>
               <div class="crm-stage-number">
                 <input v-model="stage.win_probability" type="number" min="0" max="100" @change="updateStage(stage)" />
                 <b>%</b>
               </div>
             </label>
-            <div class="flex items-end">
-              <button class="rounded-md border border-n-ruby-7 px-3 py-2 text-sm text-n-ruby-10 hover:bg-n-ruby-3" type="button" @click="deleteStage(stage)">
+            <div class="flex items-center justify-end">
+              <button class="rounded-md px-2 py-2 text-sm text-n-ruby-10 hover:bg-n-ruby-3" type="button" @click="deleteStage(stage)">
                 Excluir
               </button>
             </div>
@@ -735,7 +1088,7 @@ onMounted(loadBoard);
         </div>
       </section>
 
-      <div v-if="isMetricsOpen" class="crm-metrics mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div v-if="activeConfigTab === 'metrics'" class="crm-metrics mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
         <div class="crm-metric-card border border-n-weak bg-n-solid-1 p-3">
           <span class="crm-metric-icon i-lucide-panels-top-left" />
           <span class="text-xs text-n-slate-10">Cards ativos</span>
@@ -766,40 +1119,137 @@ onMounted(loadBoard);
           <span class="text-xs text-n-slate-10">Atrasadas</span>
           <strong class="mt-1 block text-xl text-n-slate-12">{{ metrics.overdue_activities || 0 }}</strong>
         </div>
+        <div class="crm-metric-card border border-n-weak bg-n-solid-1 p-3">
+          <span class="crm-metric-icon crm-metric-icon-danger i-lucide-flame" />
+          <span class="text-xs text-n-slate-10">SLA vencido</span>
+          <strong class="mt-1 block text-xl text-n-slate-12">{{ metrics.sla_missed_cards || 0 }}</strong>
+        </div>
       </div>
 
-      <form v-if="isRulesOpen" class="crm-config-panel mt-4 border border-n-weak bg-n-solid-1 p-4" @submit.prevent="saveRules">
-        <label class="block">
-          <span class="mb-2 block text-sm font-medium text-n-slate-12">Regras para movimentacao da IA</span>
-          <textarea v-model="rulesForm.ai_rules" rows="5" class="w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
-        </label>
-        <button class="mt-3 rounded-md bg-n-blue-9 px-3 py-2 text-sm font-semibold text-white" type="submit">
-          Salvar regras
-        </button>
-      </form>
+      <section v-if="activeConfigTab === 'rules'" class="crm-config-panel mt-4 border border-n-weak bg-n-solid-1 p-4">
+        <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 class="text-sm font-semibold tracking-tight text-n-slate-12">Regras do funil</h2>
+            <p class="mt-1 text-xs text-n-slate-11">
+              Defina como mensagens reais criam, atualizam e movem cards neste funil.
+            </p>
+          </div>
+          <button class="rounded-md border border-n-weak px-3 py-2 text-sm text-n-slate-12 hover:bg-n-alpha-2" type="button" @click="applyDelayedConversationPreset">
+            <span class="i-lucide-list-restart size-4" />
+            Modelo conversas atrasadas
+          </button>
+        </div>
 
-      <section v-if="isWebhookOpen" class="crm-config-panel mt-4 grid gap-4 border border-n-weak bg-n-solid-1 p-4 lg:grid-cols-[1fr_360px]">
-        <div>
-          <h2 class="text-sm font-semibold text-n-slate-12">Webhooks do funil</h2>
-          <div v-if="webhooks.length" class="mt-3 space-y-2">
-            <article v-for="webhook in webhooks" :key="webhook.id" class="flex items-start justify-between gap-3 border border-n-weak p-3">
-              <div class="min-w-0">
-                <strong class="block truncate text-sm text-n-slate-12">{{ webhook.name }}</strong>
-                <span class="block truncate text-xs text-n-slate-11">{{ webhook.url }}</span>
-                <span class="mt-1 block text-xs text-n-slate-10">{{ webhook.events?.join(', ') || 'Todos os eventos' }}</span>
-              </div>
-              <button class="text-sm text-n-ruby-10" type="button" @click="deleteWebhook(webhook)">Excluir</button>
+        <form class="grid gap-3 lg:grid-cols-[1fr_180px_180px_180px_auto]" @submit.prevent="saveAutomationRule">
+          <label>
+            <span class="mb-1 block text-xs font-semibold uppercase text-n-slate-10">Nome</span>
+            <input v-model="automationRuleForm.name" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" placeholder="Ex: Nao lidas" />
+          </label>
+          <label>
+            <span class="mb-1 block text-xs font-semibold uppercase text-n-slate-10">Quando</span>
+            <select v-model="automationRuleForm.condition" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12">
+              <option v-for="condition in ruleConditions" :key="condition.value" :value="condition.value">
+                {{ condition.label }}
+              </option>
+            </select>
+          </label>
+          <label>
+            <span class="mb-1 block text-xs font-semibold uppercase text-n-slate-10">Mover para</span>
+            <select v-model="automationRuleForm.stage_id" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12">
+              <option v-for="stage in stages" :key="stage.id" :value="stage.id">
+                {{ stage.name }}
+              </option>
+            </select>
+          </label>
+          <label>
+            <span class="mb-1 block text-xs font-semibold uppercase text-n-slate-10">Status</span>
+            <select v-model="automationRuleForm.enabled" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12">
+              <option :value="true">Ativa</option>
+              <option :value="false">Pausada</option>
+            </select>
+          </label>
+          <div class="flex items-end">
+            <button class="rounded-md bg-n-blue-9 px-3 py-2 text-sm font-semibold text-white" type="submit">
+              <span class="i-lucide-plus size-4" />
+              Adicionar
+            </button>
+          </div>
+        </form>
+
+        <div class="mt-5 overflow-hidden rounded-md border border-n-weak">
+          <div class="crm-rule-row is-header grid gap-3 px-4 py-3 text-xs font-semibold uppercase text-n-slate-10 lg:grid-cols-[1fr_180px_180px_120px_auto]">
+            <span>Regra</span>
+            <span>Condicao</span>
+            <span>Etapa</span>
+            <span>Status</span>
+            <span class="text-right">Acoes</span>
+          </div>
+          <div v-if="automationRules.length">
+            <article
+              v-for="rule in automationRules"
+              :key="rule.id"
+              class="crm-rule-row grid gap-3 border-t border-n-weak px-4 py-3 text-sm lg:grid-cols-[1fr_180px_180px_120px_auto]"
+            >
+              <strong class="text-n-slate-12">{{ rule.name }}</strong>
+              <span class="text-n-slate-11">{{ ruleConditionLabel(rule.condition) }}</span>
+              <span class="text-n-slate-11">{{ ruleStageLabel(rule.stage_id) }}</span>
+              <button class="text-left text-xs font-semibold" :class="rule.enabled ? 'text-n-teal-10' : 'text-n-slate-10'" type="button" @click="toggleAutomationRule(rule)">
+                {{ rule.enabled ? 'Ativa' : 'Pausada' }}
+              </button>
+              <button class="text-right text-sm text-n-ruby-10 hover:text-n-ruby-11" type="button" @click="deleteAutomationRule(rule)">
+                Remover
+              </button>
             </article>
           </div>
-          <p v-else class="mt-3 text-sm text-n-slate-11">Nenhum webhook configurado.</p>
+          <p v-else class="border-t border-n-weak px-4 py-4 text-sm text-n-slate-11">
+            Nenhuma regra estruturada ainda. Sem regras, o sync usa o funil comercial padrao.
+          </p>
         </div>
-        <form class="space-y-3" @submit.prevent="createWebhook">
-          <input v-model="webhookForm.name" required class="w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" placeholder="Nome do webhook" />
-          <input v-model="webhookForm.url" required class="w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" placeholder="https://..." />
-          <input v-model="webhookForm.access_token" class="w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" placeholder="Segredo para assinatura" />
-          <input v-model="webhookForm.events" class="w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" placeholder="card.created, card.moved" />
-          <button class="rounded-md bg-n-blue-9 px-3 py-2 text-sm font-semibold text-white" type="submit">Adicionar webhook</button>
+
+        <form class="mt-5" @submit.prevent="saveRules">
+          <label class="block">
+            <span class="mb-2 block text-sm font-medium text-n-slate-12">Orientacao livre para IA/n8n</span>
+            <textarea v-model="rulesForm.ai_rules" rows="4" class="w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" />
+          </label>
+          <button class="mt-3 rounded-md border border-n-weak px-3 py-2 text-sm font-semibold text-n-slate-12 hover:bg-n-alpha-2" type="submit">
+            Salvar orientacao
+          </button>
         </form>
+      </section>
+
+      <section v-if="activeConfigTab === 'webhooks'" class="crm-config-panel crm-config-panel-compact mt-3 border border-n-weak bg-n-solid-1 p-4">
+        <div class="mb-3">
+          <h2 class="text-sm font-semibold text-n-slate-12">Webhooks do funil</h2>
+          <p class="mt-0.5 text-xs text-n-slate-11">Dispare eventos para n8n, integrações comerciais ou auditoria externa.</p>
+        </div>
+        <form class="crm-webhook-form grid gap-2 lg:grid-cols-[180px_minmax(260px,1fr)_180px_220px_auto]" @submit.prevent="createWebhook">
+          <input v-model="webhookForm.name" required class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" placeholder="Nome" />
+          <input v-model="webhookForm.url" required class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" placeholder="https://..." />
+          <input v-model="webhookForm.access_token" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" placeholder="Segredo" />
+          <input v-model="webhookForm.events" class="crm-control w-full rounded-md border border-n-weak bg-n-alpha-2 px-3 py-2 text-sm text-n-slate-12" placeholder="card.created, card.moved" />
+          <button class="rounded-md bg-n-blue-9 px-3 py-2 text-sm font-semibold text-white" type="submit">
+            Adicionar
+          </button>
+        </form>
+        <div class="mt-4 overflow-hidden rounded-md border border-n-weak">
+          <div class="crm-webhook-row is-header grid gap-3 px-3 py-2 text-xs font-semibold uppercase text-n-slate-10 lg:grid-cols-[180px_minmax(260px,1fr)_220px_80px]">
+            <span>Nome</span>
+            <span>URL</span>
+            <span>Eventos</span>
+            <span class="text-right">Acoes</span>
+          </div>
+          <div v-if="webhooks.length">
+            <article v-for="webhook in webhooks" :key="webhook.id" class="crm-webhook-row grid gap-3 border-t border-n-weak px-3 py-2 text-sm lg:grid-cols-[180px_minmax(260px,1fr)_220px_80px]">
+              <div class="min-w-0">
+                <strong class="block truncate text-sm text-n-slate-12">{{ webhook.name }}</strong>
+              </div>
+              <span class="truncate text-xs text-n-slate-11">{{ webhook.url }}</span>
+              <span class="truncate text-xs text-n-slate-10">{{ webhook.events?.join(', ') || 'Todos os eventos' }}</span>
+              <button class="text-right text-sm text-n-ruby-10 hover:text-n-ruby-11" type="button" @click="deleteWebhook(webhook)">Excluir</button>
+            </article>
+          </div>
+          <p v-else class="border-t border-n-weak px-3 py-4 text-sm text-n-slate-11">Nenhum webhook configurado.</p>
+        </div>
       </section>
     </header>
 
@@ -814,7 +1264,7 @@ onMounted(loadBoard);
             v-for="(stage, stageIndex) in stages"
             :key="stage.id"
             class="crm-stage flex w-[320px] shrink-0 flex-col border border-n-weak bg-n-alpha-1"
-            :class="stageAccentClass(stageIndex)"
+            :class="stageAccentClass(stage, stageIndex)"
             @dragover.prevent
             @drop="onDrop(stage)"
           >
@@ -826,6 +1276,30 @@ onMounted(loadBoard);
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
                   <span class="rounded-md bg-n-alpha-2 px-2.5 py-1 text-xs font-semibold text-n-blue-11">{{ visibleCards(stage.id).length }}</span>
+                  <div class="relative" v-on-clickaway="() => (openStageMenuId = null)">
+                    <button
+                      class="inline-flex size-8 items-center justify-center rounded-md text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12"
+                      :class="{ 'bg-n-alpha-2 text-n-slate-12': openStageMenuId === stage.id }"
+                      type="button"
+                      aria-label="Opcoes da etapa"
+                      @click="toggleStageMenu(stage.id)"
+                    >
+                      <span class="i-lucide-more-horizontal size-4" />
+                    </button>
+                    <div
+                      v-if="openStageMenuId === stage.id"
+                      class="absolute right-0 z-30 mt-2 w-48 overflow-hidden rounded-md border border-n-weak bg-n-solid-1 py-1 shadow-lg"
+                    >
+                      <button class="crm-menu-item" type="button" @click="runStageMenuAction(openStageSettings)">
+                        <span class="i-lucide-settings-2 size-4" />
+                        Editar etapa
+                      </button>
+                      <button class="crm-menu-item crm-menu-item-danger" type="button" @click="runStageMenuAction(() => deleteStage(stage))">
+                        <span class="i-lucide-trash-2 size-4" />
+                        Excluir etapa
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -840,9 +1314,56 @@ onMounted(loadBoard);
                 @dragstart="onDragStart(card)"
                 @click="editCard(card)"
               >
-                <div class="flex items-start justify-between gap-3">
-                  <h3 class="min-w-0 text-sm font-bold leading-5 text-n-slate-12">{{ card.title }}</h3>
-                  <span class="shrink-0 rounded-md bg-n-alpha-2 px-2 py-1 text-[11px] font-medium text-n-blue-11">{{ staleLabel(card) }}</span>
+                <div class="crm-card-head grid items-start gap-2">
+                  <h3 class="min-w-0 break-words text-sm font-bold leading-5 text-n-slate-12">{{ card.title }}</h3>
+                  <div class="flex shrink-0 items-center gap-2">
+                    <span class="crm-urgency-chip" :class="urgencyChipClass(card)">
+                      {{ compactUrgencyLabel(card) }}
+                    </span>
+                    <div class="relative" v-on-clickaway="() => (openCardMenuId = null)">
+                      <button
+                        class="inline-flex size-7 items-center justify-center rounded-md text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12"
+                        :class="{ 'bg-n-alpha-2 text-n-slate-12': openCardMenuId === card.id }"
+                        type="button"
+                        aria-label="Opcoes do card"
+                        @click.stop="toggleCardMenu(card.id)"
+                      >
+                        <span class="i-lucide-more-horizontal size-4" />
+                      </button>
+                      <div
+                        v-if="openCardMenuId === card.id"
+                        class="absolute right-0 z-30 mt-2 w-52 overflow-hidden rounded-md border border-n-weak bg-n-solid-1 py-1 shadow-lg"
+                        @click.stop
+                      >
+                        <button class="crm-menu-item" type="button" @click="runCardMenuAction(() => editCard(card))">
+                          <span class="i-lucide-pencil size-4" />
+                          Editar card
+                        </button>
+                        <a
+                          v-if="card.conversation"
+                          class="crm-menu-item"
+                          :href="cardConversationUrl(card.conversation)"
+                          @click.stop="openCardMenuId = null"
+                        >
+                          <span class="i-lucide-message-circle size-4" />
+                          Abrir conversa
+                        </a>
+                        <button
+                          class="crm-menu-item"
+                          type="button"
+                          :disabled="isSummarizing || !card.conversation"
+                          @click="runCardMenuAction(() => summarizeCardConversation(card))"
+                        >
+                          <span class="i-lucide-sparkles size-4" />
+                          Resumo IA
+                        </button>
+                        <button class="crm-menu-item crm-menu-item-danger" type="button" @click="runCardMenuAction(() => deleteCard(card))">
+                          <span class="i-lucide-archive size-4" />
+                          Arquivar card
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <div class="mt-3 flex items-center gap-2">
                   <span class="crm-contact-avatar">
@@ -890,7 +1411,7 @@ onMounted(loadBoard);
             </div>
           </section>
 
-          <button class="crm-add-stage flex w-[260px] shrink-0 flex-col items-center justify-center gap-2 border border-dashed border-n-weak bg-n-alpha-1 p-6 text-sm font-semibold text-n-slate-11 hover:border-n-blue-8 hover:bg-n-alpha-2 hover:text-n-blue-11" type="button" @click="isStageOpen = true">
+          <button class="crm-add-stage flex w-[260px] shrink-0 flex-col items-center justify-center gap-2 border border-dashed border-n-weak bg-n-alpha-1 p-6 text-sm font-semibold text-n-slate-11 hover:border-n-blue-8 hover:bg-n-alpha-2 hover:text-n-blue-11" type="button" @click="activeConfigTab = 'stages'">
             <span class="i-lucide-columns-3 size-5" />
             Adicionar etapa
           </button>
@@ -899,6 +1420,7 @@ onMounted(loadBoard);
 
       <aside
         v-if="isDetailOpen"
+        v-on-clickaway="closeDetailPanel"
         class="crm-detail-panel min-h-0 overflow-y-auto border-l border-n-weak bg-n-solid-1 p-5"
       >
         <div class="mb-4 flex items-center justify-between gap-3">
@@ -1122,12 +1644,24 @@ onMounted(loadBoard);
 }
 
 .crm-page-header {
-  padding: var(--crm-page-padding);
+  padding: 0.625rem var(--crm-page-padding) 0.5rem;
   background: rgb(var(--background-color));
 }
 
 .crm-title-row {
   align-items: center;
+}
+
+.crm-pipeline-title-select select {
+  width: min(100%, 21rem);
+  border-radius: 0.625rem;
+  line-height: 1.15;
+}
+
+.crm-pipeline-title-select select:hover,
+.crm-pipeline-title-select select:focus {
+  background: rgba(var(--alpha-2));
+  border-color: rgb(var(--border-weak));
 }
 
 .crm-title-row h1 {
@@ -1181,7 +1715,7 @@ onMounted(loadBoard);
 .crm-header-actions button {
   display: inline-flex;
   min-width: 0;
-  min-height: 2.5rem;
+  min-height: 2.25rem;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
@@ -1197,15 +1731,62 @@ onMounted(loadBoard);
   box-shadow: none;
 }
 
+.crm-board-tools input,
+.crm-board-filter {
+  min-height: 2.25rem;
+}
+
+.crm-board-filter {
+  max-width: 11rem;
+}
+
+.crm-config-tabs {
+  min-height: 2rem;
+}
+
+.crm-config-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 2px solid transparent;
+  color: rgb(var(--slate-11));
+  font-size: 0.8125rem;
+  font-weight: 650;
+  padding: 0.4rem 0.75rem;
+}
+
+.crm-config-tab:hover {
+  color: rgb(var(--slate-12));
+  background: rgba(var(--alpha-2));
+}
+
+.crm-config-tab.is-active {
+  border-color: #ff5b25;
+  color: rgb(var(--slate-12));
+}
+
+.crm-rule-row {
+  align-items: center;
+  background: rgb(var(--surface-1));
+}
+
+.crm-rule-row:not(.is-header):hover {
+  background: rgba(var(--alpha-2));
+}
+
+.crm-rule-row.is-header {
+  background: rgba(var(--alpha-1));
+}
+
 .crm-metrics {
   grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
 }
 
 .crm-metric-card {
   position: relative;
-  min-height: 5.5rem;
+  min-height: 4.75rem;
   overflow: hidden;
-  padding: 1.125rem;
+  padding: 0.875rem 1rem;
   background: rgb(var(--surface-2));
   box-shadow: none;
 }
@@ -1229,12 +1810,16 @@ onMounted(loadBoard);
 }
 
 .crm-metric-card strong {
-  font-size: clamp(1.1rem, 1.25vw, 1.5rem);
+  font-size: clamp(1rem, 1.1vw, 1.35rem);
   line-height: 1.15;
 }
 
 .crm-config-panel {
   box-shadow: none;
+}
+
+.crm-config-panel-compact {
+  padding: 1rem;
 }
 
 .crm-config-panel textarea {
@@ -1247,14 +1832,14 @@ onMounted(loadBoard);
 }
 
 .crm-board-scroll {
-  padding: var(--crm-page-padding);
+  padding: 0.75rem var(--crm-page-padding);
   scrollbar-color: rgba(var(--border-container)) transparent;
   scrollbar-width: thin;
 }
 
 .crm-stage {
   position: relative;
-  width: clamp(19rem, 23vw, 22rem);
+  width: clamp(17.5rem, 21vw, 20rem);
   max-height: 100%;
   overflow: hidden;
   border-color: rgb(var(--border-weak));
@@ -1263,11 +1848,11 @@ onMounted(loadBoard);
 }
 
 .crm-stage > div:first-child {
-  padding: 1.125rem;
+  padding: 0.75rem 0.875rem;
 }
 
 .crm-stage > div:last-child {
-  padding: 1.125rem;
+  padding: 0.75rem 0.875rem;
 }
 
 .crm-stage::before {
@@ -1298,6 +1883,10 @@ onMounted(loadBoard);
   --crm-stage-accent: rgb(var(--ruby-9));
 }
 
+.crm-stage.accent-slate {
+  --crm-stage-accent: rgb(var(--slate-9));
+}
+
 .crm-stage-dot {
   display: block;
   width: 0.625rem;
@@ -1309,7 +1898,7 @@ onMounted(loadBoard);
 }
 
 .crm-stage-title {
-  min-height: 2rem;
+  min-height: 1.75rem;
   padding: 0.25rem 0;
   background: transparent;
 }
@@ -1325,7 +1914,18 @@ onMounted(loadBoard);
 }
 
 .crm-stage-config-row {
-  border-radius: var(--crm-panel-radius);
+  align-items: center;
+  background: rgb(var(--surface-1));
+}
+
+.crm-stage-table-head,
+.crm-webhook-row.is-header {
+  background: rgba(var(--alpha-1));
+}
+
+.crm-stage-config-row:hover,
+.crm-webhook-row:not(.is-header):hover {
+  background: rgba(var(--alpha-2));
 }
 
 .crm-stage-number input {
@@ -1363,7 +1963,7 @@ onMounted(loadBoard);
 .crm-deal-card {
   border-color: rgb(var(--border-weak));
   background: rgb(var(--surface-2));
-  padding: 1rem;
+  padding: 0.875rem;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
   transition:
     border-color 160ms ease,
@@ -1403,6 +2003,40 @@ onMounted(loadBoard);
   background: rgba(var(--alpha-1));
   padding: 0.25rem 0.5rem;
   color: rgb(var(--slate-11));
+}
+
+.crm-card-head {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.crm-urgency-chip {
+  display: inline-flex;
+  max-width: 5.75rem;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 0.375rem;
+  padding: 0.1875rem 0.45rem;
+  font-size: 0.65625rem;
+  font-weight: 600;
+  line-height: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-urgency-fresh {
+  background: rgba(var(--teal-9), 0.12);
+  color: rgb(var(--teal-11));
+}
+
+.crm-urgency-stale {
+  background: rgba(var(--amber-9), 0.14);
+  color: rgb(var(--amber-11));
+}
+
+.crm-urgency-critical {
+  background: rgba(var(--ruby-9), 0.14);
+  color: rgb(var(--ruby-11));
 }
 
 .crm-detail-panel input,
@@ -1556,6 +2190,30 @@ button:disabled {
   opacity: 0.45;
 }
 
+.crm-menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.625rem 0.75rem;
+  color: rgb(var(--slate-12));
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  text-align: left;
+}
+
+.crm-menu-item:hover {
+  background: rgba(var(--alpha-2));
+}
+
+.crm-menu-item-danger {
+  color: rgb(var(--ruby-10));
+}
+
+.crm-menu-item-danger:hover {
+  background: rgb(var(--ruby-3));
+}
+
 :global(.dark) .crm-kanban-page {
   --background-color: 13 15 19;
   --surface-1: 13 14 18;
@@ -1620,7 +2278,12 @@ button:disabled {
 
 @media (max-width: 900px) {
   .crm-page-header {
-    padding: 1rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .crm-pipeline-title-select,
+  .crm-board-tools {
+    width: 100%;
   }
 
   .crm-header-actions {
@@ -1629,6 +2292,10 @@ button:disabled {
 
   .crm-header-actions button {
     flex: 1 1 auto;
+  }
+
+  .crm-header-actions .crm-menu-item {
+    flex: none;
   }
 
   .crm-metrics {
